@@ -12,7 +12,7 @@ import { LPGA_SEASON as season } from '../data/lpgaCourses.js';
  * opened we geocode it and pull the hole layout from OpenStreetMap, then cache
  * both on the course so it is instant next time.
  */
-export default function CoursePicker({ token, onPick, onSettings }) {
+export default function CoursePicker({ token, user, onPick, onSettings }) {
   const [courses, setCourses] = useState(db.getCourses);
   const [query, setQuery] = useState('');
   const [adding, setAdding] = useState(false);
@@ -102,6 +102,15 @@ export default function CoursePicker({ token, onPick, onSettings }) {
           <div className="grow">
             <h1>Courses</h1>
             <p>Seeded with the {season} LPGA schedule. Add anything that is missing.</p>
+            {user && (
+              <p style={{ marginTop: 6 }}>
+                Signed in as <b style={{ color: 'var(--text)' }}>{user.email}</b>{' '}
+                <button className="btn ghost" style={{ minHeight: 0, padding: '2px 8px' }}
+                        onClick={async () => { await db.auth.signOut(); }}>
+                  Sign out
+                </button>
+              </p>
+            )}
           </div>
           <button className="btn" onClick={onSettings}>Kits</button>
           <button className="btn primary" onClick={() => setAdding(true)}>Add course</button>

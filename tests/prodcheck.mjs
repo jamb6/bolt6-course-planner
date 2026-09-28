@@ -40,9 +40,12 @@ ok(await page.evaluate(() => !!document.querySelector('link[rel=stylesheet], sty
    'styles are present');
 ok(errs.length === 0, 'no console errors', errs.slice(0,3).join(' | '));
 
-// Cloudflare serves these; check they made it into the build output.
-ok(fs.existsSync(path.join(DIST, '_headers')) && fs.existsSync(path.join(DIST, '_redirects')),
-   '_headers and _redirects ship with the build');
+// Cloudflare reads _headers for the cache rules. There is deliberately no
+// _redirects — a catch-all rule is rejected as an infinite loop, and the SPA
+// fallback comes from not_found_handling in wrangler.jsonc instead.
+ok(fs.existsSync(path.join(DIST, '_headers')), '_headers ships with the build');
+ok(!fs.existsSync(path.join(DIST, '_redirects')),
+   'no _redirects, which Cloudflare rejects at deploy time');
 
 const chunks = fs.readdirSync(path.join(DIST, 'assets'));
 const total = chunks.reduce((n, f) => n + fs.statSync(path.join(DIST, 'assets', f)).size, 0);

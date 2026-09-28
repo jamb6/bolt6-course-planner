@@ -44,8 +44,15 @@ VITE_SUPABASE_URL       https://xxxxxxxx.supabase.co
 VITE_SUPABASE_ANON_KEY  sb_publishable_… (or the legacy eyJ… anon key)
 ```
 
+Leave **Deploy command** empty. Pages builds and publishes by itself; anything
+in that field replaces the build step and the deploy fails.
+
 Deploy. You get `bolt6-course-planner.pages.dev`, and every push to `main`
 rebuilds it.
+
+A healthy build log runs `npm clean-install`, then `npm run build`, then lists
+the `dist/assets/...` files and finishes with "Success: Assets published". If
+`wrangler` appears anywhere in it, the build settings did not take.
 
 ## 3. Lock the Mapbox token to that domain
 
@@ -73,18 +80,14 @@ Scopes should be `styles:read`, `fonts:read`, `tiles:read` and
 - **Redirect URLs**: add that, the `*.pages.dev` preview wildcard, your custom
   domain, and `http://localhost:5173`
 
-Sign-in links bounce without this, and the failure looks like nothing
-happening, so it is worth getting right first time.
+Sign-in is email and password, so this matters less than it used to, but
+Supabase still uses the Site URL in a few places and it costs nothing to set.
 
 ## 5. Decide who can sign in
 
-Right now anyone who can receive a magic link gets into the workspace and can
-edit or delete anything. Before you share the URL, narrow it in Supabase — not
-in the app:
-
-- **Authentication → Providers → Email**: turn **off** "Enable sign-ups" once
-  the team has accounts, and invite people from **Authentication → Users**.
-- Or leave sign-ups on and restrict by email domain.
+Accounts are created by you in **Authentication → Users → Add user** (tick Auto
+Confirm User). Keep **Enable sign-ups** off, or anyone who reaches the URL can
+give themselves an account and delete plans.
 
 ## 6. Custom domain, optional
 
@@ -103,8 +106,48 @@ without 122 assertions passing.
 It needs five repository secrets: the three `VITE_*` values above plus
 `CLOUDFLARE_API_TOKEN` (Pages → Edit permission) and `CLOUDFLARE_ACCOUNT_ID`.
 
-Delete the workflow if you use the git integration; running both just deploys
-twice.
+**Use one or the other.** If you connect the repo to Cloudflare, delete the
+workflow — otherwise every push deploys twice, and the workflow fails and
+emails you until its secrets exist.
+
+## Pages project or Worker?
+
+Cloudflare's current wizard usually creates a **Worker**, not a Pages project,
+even though the section is still called "Workers & Pages". The two need
+different settings, and the error you get from mixing them up is
+*"Missing entry-point to Worker script or to assets directory"*.
+
+Tell them apart by the URL on the Overview tab: `*.workers.dev` is a Worker,
+`*.pages.dev` is Pages. Or by the Settings page — a Worker has **Deploy
+command** and no **Build output directory**.
+
+**If it is a Worker** (the likely case), `wrangler.jsonc` in this repo tells it
+where the built files are. Settings → Build:
+
+| Field | Value |
+|---|---|
+| Build command | `npm run build` |
+| Deploy command | `npx wrangler deploy` |
+| Root directory | `/` |
+
+The `name` in `wrangler.jsonc` must match the Cloudflare project name.
+
+Workers **does** read `public/_headers`, so the cache rules in it still apply.
+
+It also reads `public/_redirects`, which is why this project no longer has one.
+A catch-all `/* /index.html 200` rule is rejected at deploy time with
+*"Infinite loop detected in this rule"* — `/index.html` would match its own
+rule. `not_found_handling` above does the same job correctly, so the file is
+both redundant and fatal. Do not add one back.
+
+**If it is a Pages project**, delete `wrangler.jsonc` — its presence pushes the
+wizard down the Workers path. Settings → Build:
+
+| Field | Value |
+|---|---|
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+| Deploy command | *(empty)* |
 
 ---
 

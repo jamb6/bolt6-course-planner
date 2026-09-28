@@ -3,61 +3,64 @@ import * as db from '../lib/db/index.js';
 
 /**
  * Sign-in, shown only when the app is pointed at a shared Supabase workspace.
- * Magic link rather than passwords — one less thing to manage, and nobody has
- * to invent a password for an internal tool.
+ *
+ * Email and password rather than a magic link: accounts are created in the
+ * Supabase dashboard, so nothing here depends on an email arriving. On an
+ * event build over course wifi that is the difference between signing in and
+ * not.
  */
 export default function AuthGate() {
   const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
+  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
-  const send = async (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    setBusy(true); setError(null);
+    setBusy(true);
+    setError(null);
     try {
-      await db.auth.signIn(email.trim());
-      setSent(true);
+      await db.auth.signIn(email.trim(), password);
+      // The auth listener in App picks this up and loads the workspace.
     } catch (err) {
-      setError(err.message);
-    } finally {
+      setError(/invalid login credentials/i.test(err.message)
+        ? 'That email and password do not match an account.'
+        : err.message);
       setBusy(false);
     }
   };
 
-  if (sent) {
-    return (
-      <div className="modal-bg">
-        <div className="card modal">
-          <h2>Check your email</h2>
-          <p style={{ color: 'var(--muted)', fontSize: 13, margin: 0 }}>
-            A sign-in link is on its way to <b>{email}</b>. Open it on this device and you
-            will land back here, signed in.
-          </p>
-          <button className="btn" onClick={() => setSent(false)}>Use a different address</button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="modal-bg">
-      <form className="card modal" onSubmit={send}>
+      <form className="card modal" onSubmit={submit}>
         <h2>Bolt6 Course Planner</h2>
         <p style={{ color: 'var(--muted)', fontSize: 13, margin: 0 }}>
           Sign in to reach the shared workspace — courses, plans and kits are the same for
           everyone on the team.
         </p>
+
         <div className="field">
-          <label htmlFor="email">Work email</label>
-          <input id="email" type="email" autoComplete="email" required
+          <label htmlFor="email">Email</label>
+          <input id="email" type="email" autoComplete="username" required
                  placeholder="you@bolt6.com"
                  value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
+
+        <div className="field">
+          <label htmlFor="password">Password</label>
+          <input id="password" type="password" autoComplete="current-password" required
+                 value={password} onChange={(e) => setPassword(e.target.value)} />
+        </div>
+
         {error && <div className="banner bad">{error}</div>}
-        <button className="btn primary" type="submit" disabled={busy || !email.trim()}>
-          {busy ? 'Sending…' : 'Email me a sign-in link'}
+
+        <button className="btn primary" type="submit" disabled={busy || !email.trim() || !password}>
+          {busy ? 'Signing in…' : 'Sign in'}
         </button>
+
+        <p style={{ color: 'var(--dim)', fontSize: 12, margin: 0 }}>
+          No account? Whoever administers the Supabase project creates one for you.
+        </p>
       </form>
     </div>
   );

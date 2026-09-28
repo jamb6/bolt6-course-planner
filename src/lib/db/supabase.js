@@ -34,12 +34,23 @@ export async function currentUser() {
   return data.session?.user ?? null;
 }
 
-export async function signInWithEmail(email) {
+/**
+ * Email and password. Accounts are created in the Supabase dashboard rather
+ * than signed up for in the app — this is an internal tool with a known set of
+ * people, and it keeps email out of the critical path entirely. That matters
+ * on an event build, where signing in over patchy course wifi should not
+ * depend on an email arriving.
+ */
+export async function signInWithPassword(email, password) {
   const sb = await getClient();
-  const { error } = await sb.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: window.location.origin },
-  });
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+}
+
+/** Lets someone replace the password they were handed. */
+export async function updatePassword(password) {
+  const sb = await getClient();
+  const { error } = await sb.auth.updateUser({ password });
   if (error) throw error;
 }
 

@@ -29,7 +29,12 @@ export default function App() {
 
   useEffect(() => {
     let live = true;
+    let startedFor = null;          // don't reload the workspace for the same user twice
+
     const start = async (user) => {
+      if (startedFor === (user?.id ?? 'local')) return;
+      startedFor = user?.id ?? 'local';
+      setBoot({ state: 'loading', user });
       try {
         await db.init();
         if (live) setBoot({ state: 'ready', user });
@@ -40,14 +45,19 @@ export default function App() {
 
     (async () => {
       if (!db.auth.enabled) return start(null);
-      const user = await db.auth.currentUser();
-      if (!live) return;
-      if (!user) return setBoot({ state: 'signed-out', user: null });
-      start(user);
+
+      // Register before checking the session, so signing in from the gate is
+      // what moves the app on. Supabase also replays the current session here.
       db.auth.onChange((next) => {
         if (!live) return;
-        if (!next) setBoot({ state: 'signed-out', user: null });
+        if (next) start(next);
+        else { startedFor = null; setBoot({ state: 'signed-out', user: null }); }
       });
+
+      const user = await db.auth.currentUser();
+      if (!live) return;
+      if (user) start(user);
+      else setBoot({ state: 'signed-out', user: null });
     })();
 
     return () => { live = false; };
@@ -92,6 +102,6 @@ export default function App() {
     );
   }
 
-  return <CoursePicker token={token} onPick={setPendingCourse}
+  return <CoursePicker token={token} user={boot.user} onPick={setPendingCourse}
                        onSettings={() => setSettingsOpen(true)} />;
 }

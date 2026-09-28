@@ -74,16 +74,28 @@ in.
 
 ## 4. Let people in
 
-**Authentication → Providers → Email** — make sure it is on. Magic link only,
-no passwords to manage.
+Sign-in is **email and password**, and accounts are created by you rather than
+signed up for in the app. That is deliberate: it keeps email out of the
+critical path. Supabase's built-in email service sends only 2 messages an hour
+and will only deliver to your own project team, so magic links cannot work for
+a team without paying for an SMTP provider — and waiting for an email over
+course wifi is a poor way to start an event day anyway.
 
-**Authentication → URL Configuration** — add your dev and deployed URLs to the
-redirect allow-list, e.g. `http://localhost:5173` and wherever you host it.
-Sign-in links bounce without this.
+**Authentication → Providers → Email** — on. Turn **Confirm email off**, so an
+account you create works immediately instead of waiting on a confirmation
+message nobody will receive.
 
-Anyone who can receive a link can sign in and see everything. If that is too
-open, restrict it in Supabase (allowed email domains, or invite-only) rather
-than in the app.
+**Authentication → Users → Add user** for each person:
+
+- their email
+- a password — anything reasonable; they can change it in the app under Kits
+- tick **Auto Confirm User**
+
+That is the whole flow. There is no sign-up screen and no password reset by
+email; if someone is locked out you reset their password in this same panel.
+
+Leave **Enable sign-ups** off. With it on, anyone who reaches the URL could
+create themselves an account and edit or delete plans.
 
 ## 5. Bring your existing work across
 
@@ -101,7 +113,8 @@ Everyone else can skip it.
 Worth ten minutes before anyone relies on it, because I could not run this end
 to end myself — see the note at the bottom.
 
-1. Sign in. You should land on the course list, seeded with the 2027 schedule.
+1. Sign in with an account you created. You should land on the course list,
+   seeded with the 2027 schedule.
 2. **Table Editor → course** — 32 rows. If it is empty, the seed did not run;
    check the browser console for a policy error.
 3. Make a plan, place three cameras, draw a cable.

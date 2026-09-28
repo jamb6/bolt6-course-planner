@@ -170,7 +170,8 @@ export async function deleteEntity(planId, entityId) {
 export const auth = {
   enabled: useRemote,
   currentUser: () => (useRemote ? supabase.currentUser() : Promise.resolve(null)),
-  signIn: (email) => supabase.signInWithEmail(email),
+  signIn: (email, password) => supabase.signInWithPassword(email, password),
+  changePassword: (password) => supabase.updatePassword(password),
   signOut: () => supabase.signOut(),
   onChange: (fn) => (useRemote ? supabase.onAuthChange(fn) : Promise.resolve(null)),
 };

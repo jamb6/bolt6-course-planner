@@ -79,12 +79,33 @@ await page.click('.btn:has-text("Add a kit")');
 await page.waitForTimeout(150);
 ok(await page.$$eval('.card', (e) => e.length) === 2, 'more kits can be added');
 
+// Fields edit locally and save on a debounce, so wait for the saved marker
+// rather than guessing at a delay.
+const savedFirstKit = () => page.waitForSelector('.card:first-child .kit-state:text("Saved")', { timeout: 5000 });
+const storedKits = () => page.evaluate(() => JSON.parse(localStorage.getItem('b6.kits')));
+
+const nameField = page.locator('input[id^="kit-name-"]').first();
+await nameField.fill('Tour kit A');
+ok(await nameField.inputValue() === 'Tour kit A',
+   'the kit name accepts typing', await nameField.inputValue());
+await savedFirstKit();
+ok((await storedKits())[0].name === 'Tour kit A', 'and the new name is saved');
+
 const outField = page.locator('input[id^="kit-out-"]').first();
 await outField.fill('2, 4-5, 61, 0');
-await page.waitForTimeout(200);
-const kitStored = await page.evaluate(() => JSON.parse(localStorage.getItem('b6.kits'))[0]);
+await savedFirstKit();
+const kitStored = (await storedKits())[0];
 ok(JSON.stringify(kitStored.unavailable) === '[2,4,5]',
    'ranges parse and out-of-range numbers are dropped', JSON.stringify(kitStored.unavailable));
+ok(kitStored.name === 'Tour kit A', 'editing one field does not clobber another');
+
+const sizeField = page.locator('input[id^="kit-size-"]').first();
+await sizeField.fill('72');
+await savedFirstKit();
+ok((await storedKits())[0].size === 72, 'the kit size is editable');
+await sizeField.fill('60');
+await savedFirstKit();
+
 const hint = await page.textContent('.hint');
 ok(/57.*of 60/.test(hint), 'the kit reports how many cameras are left', hint.replace(/\s+/g, ' ').trim());
 await page.click('.btn:has-text("Back")');

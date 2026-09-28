@@ -1,8 +1,23 @@
 {
+  // Deploys the built site as a Worker serving static assets.
+  //
+  // Cloudflare's current wizard creates Workers rather than Pages projects, and
+  // a Worker needs to be told where the files are — without this, the deploy
+  // fails with "Missing entry-point to Worker script or to assets directory".
+  //
+  // Dashboard build settings that go with it:
+  //   Build command   npm run build
+  //   Deploy command  npx wrangler deploy
+  //   Root directory  /
+  //
+  // Change "name" to match the project you created in Cloudflare.
   "name": "bolt6-course-planner",
   "compatibility_date": "2026-09-01",
   "assets": {
     "directory": "./dist",
+    // The planner keeps every screen in state rather than in the URL, so any
+    // path serves the app instead of a 404. This replaces public/_redirects,
+    // which Workers does not read.
     "not_found_handling": "single-page-application"
   }
 }
