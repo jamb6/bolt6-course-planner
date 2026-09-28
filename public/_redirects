@@ -1,0 +1,4 @@
+# The planner has no client-side routing — every screen is state, not a URL.
+# This is insurance: any path someone bookmarks or mistypes serves the app
+# instead of a 404, and magic-link redirects always land somewhere real.
+/*  /index.html  200

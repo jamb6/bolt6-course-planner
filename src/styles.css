@@ -1,0 +1,205 @@
+/* ---------------------------------------------------------------- tokens */
+:root {
+  --bg: #0B1017;
+  --panel: #141C26;
+  --panel-2: #1C2733;
+  --line: #2A3947;
+  --text: #DEE7F0;
+  --muted: #8699AB;
+  --dim: #5D7183;
+  --accent: #42C6FF;
+  --accent-ink: #062130;
+  --warn: #FFB020;
+  --bad: #FF3D71;
+  --radius: 10px;
+  --tap: 40px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 14px/1.45 var(--sans); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { background: none; border: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.label { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+
+/* ------------------------------------------------------------ primitives */
+.btn {
+  min-height: var(--tap); padding: 0 14px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--panel-2);
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn:hover { border-color: var(--dim); }
+.btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 650; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 650; }
+.btn.danger { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 50%, var(--line)); }
+.btn.ghost { border-color: transparent; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field > label { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+.field input, .field select, .field textarea {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 9px 10px; min-height: var(--tap); width: 100%;
+}
+.field textarea { min-height: 84px; resize: vertical; font: inherit; }
+.row { display: flex; gap: 10px; }
+.hint { margin: -4px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--muted); }
+.hint b { color: var(--text); font-family: var(--mono); }
+.row > * { flex: 1; }
+.check { display: flex; align-items: center; gap: 10px; min-height: var(--tap); cursor: pointer; }
+.check input { width: 18px; height: 18px; min-height: 0; accent-color: var(--accent); }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.banner { border: 1px solid var(--line); background: var(--panel-2); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.banner.warn { border-color: var(--warn); color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); }
+.banner.bad  { border-color: var(--bad);  color: var(--bad);  background: color-mix(in srgb, var(--bad) 10%, transparent); }
+
+/* ----------------------------------------------------------- list screens */
+.screen { height: 100%; overflow-y: auto; padding: 32px 16px 64px; }
+.screen-inner { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+.screen h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
+.screen h2 { margin: 0; font-size: 15px; }
+.screen p  { margin: 0; color: var(--muted); font-size: 13px; }
+.head { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.head .grow { flex: 1; min-width: 200px; }
+
+.list { display: flex; flex-direction: column; gap: 8px; }
+.item {
+  display: flex; align-items: center; gap: 14px; text-align: left; width: 100%;
+  padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--panel);
+}
+.item:hover { border-color: var(--dim); }
+.item .grow { flex: 1; min-width: 0; }
+.item b { display: block; font-weight: 600; }
+.item small { color: var(--muted); font-size: 12px; }
+.tag { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; padding: 3px 7px; border-radius: 5px; background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); }
+.tag.accent { color: var(--accent); border-color: var(--accent); }
+.empty { padding: 28px; text-align: center; color: var(--dim); border: 1px dashed var(--line); border-radius: var(--radius); }
+
+/* ------------------------------------------------------------- planner */
+.planner { position: fixed; inset: 0; }
+.map { position: absolute; inset: 0; }
+.mapboxgl-ctrl-logo { opacity: .6; }
+
+.overlay { position: absolute; z-index: 5; }
+.bar {
+  display: flex; align-items: center; gap: 8px; padding: 6px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  backdrop-filter: blur(12px); border: 1px solid var(--line); border-radius: var(--radius);
+}
+.top-right { top: 12px; right: 12px; max-width: calc(100vw - 24px); overflow-x: auto; scrollbar-width: none; }
+.top-right::-webkit-scrollbar { display: none; }
+
+/* Bottom of the screen: build tools with the hole row joined underneath.
+   Both bars stretch to the same width so the join reads as one block. */
+.bottom {
+  bottom: 12px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: stretch; gap: 0;
+  max-width: calc(100vw - 24px);
+}
+.build-stack { position: relative; display: flex; flex-direction: column; align-items: stretch; }
+.bottom .bar { justify-content: center; }
+/* Seam between the build bar and the hole row. */
+.build-bar { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: 0; }
+.hole-bar { border-top-left-radius: 0; border-top-right-radius: 0; }
+
+/* A group's buttons sit flush on top of the bar, only as wide as they need,
+   centred on whichever root button opened them. */
+.group-pop {
+  position: absolute; bottom: 100%; transform: translateX(-50%);
+  width: max-content; white-space: nowrap;
+  border-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0;
+}
+
+.hole-bar { gap: 3px; }
+.hole-nav { min-height: 32px; padding: 0 8px; }
+.hole-btn {
+  min-width: 30px; height: 32px; border-radius: 6px; background: var(--panel-2);
+  border: 1px solid transparent; font-family: var(--mono); font-size: 13px;
+}
+.hole-btn.wide { min-width: 42px; font-family: var(--sans); font-size: 12px; }
+/* Dimmed until the hole has a camera on it, so what is left to do is obvious. */
+.hole-btn[data-empty="yes"] { opacity: .42; }
+.hole-btn:hover { opacity: 1; border-color: var(--dim); }
+.hole-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 700; opacity: 1; }
+
+.tool-btn { height: var(--tap); padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); display: flex; align-items: center; gap: 8px; }
+.tool-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 650; }
+.swatch { width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(0,0,0,.6); flex: none; }
+.swatch.square { border-radius: 3px; background: #fff; }
+.divider { width: 1px; align-self: stretch; background: var(--line); margin: 0 2px; }
+.layout-tag {
+  font-size: 10px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700;
+  color: var(--accent-ink); background: var(--accent); border-radius: 6px; padding: 6px 9px;
+}
+
+.stats { display: flex; align-items: center; gap: 13px; padding-left: 13px; margin-left: 5px; border-left: 1px solid var(--line); }
+.stats-course { padding-left: 0; margin-left: 0; border-left: 0; padding-right: 13px; margin-right: 5px; border-right: 1px solid var(--line); }
+.stats-scope {
+  font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent);
+  font-weight: 700; writing-mode: vertical-rl; transform: rotate(180deg);
+  max-height: 46px; opacity: .85;
+}
+.stat { display: flex; flex-direction: column; align-items: center; min-width: 46px; }
+.stat b { font-family: var(--mono); font-size: 17px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); white-space: nowrap; }
+
+.panel {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 320px; z-index: 10;
+  background: var(--panel); border-left: 1px solid var(--line);
+  display: flex; flex-direction: column;
+}
+.panel-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.panel-body { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+.panel-foot { padding: 12px 14px; border-top: 1px solid var(--line); display: flex; gap: 8px; }
+
+/* The entity panel owns the right edge, so shift the chrome clear of it.
+   Without this the panel sits on top of the Menu button. */
+.planner.with-panel .top-right { right: 332px; }
+.planner.with-panel .menu { right: 332px; }
+.planner.with-panel .bottom { transform: translateX(calc(-50% - 160px)); }
+
+.menu { position: absolute; top: 60px; right: 12px; z-index: 12; width: 250px; padding: 6px; }
+.menu button { display: block; width: 100%; text-align: left; padding: 11px 12px; border-radius: 7px; }
+.menu button:hover { background: var(--panel-2); }
+.menu hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+.menu-kit { padding: 9px 12px; display: flex; flex-direction: column; gap: 5px; }
+.menu-kit label { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+.menu-kit select { background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px; padding: 7px 8px; width: 100%; }
+.menu-kit small { font-size: 11px; color: var(--muted); }
+
+.note-tip {
+  position: absolute; z-index: 30; pointer-events: none;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 9px 11px; box-shadow: 0 10px 28px rgba(0, 0, 0, .55);
+}
+.note-tip b { display: block; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.note-tip p { margin: 5px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--text); white-space: pre-wrap; }
+
+/* Hints live top-left, which is free now the hole row moved to the bottom.
+   Never interactive — at the bottom it was intercepting clicks on the tools. */
+.toast {
+  position: absolute; top: 12px; left: 12px; z-index: 20; pointer-events: none;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 9px 14px; font-size: 12.5px; box-shadow: 0 8px 26px rgba(0,0,0,.5);
+  max-width: calc(100vw - 24px);
+}
+
+.modal-bg { position: fixed; inset: 0; z-index: 50; background: rgba(4,8,12,.72); display: grid; place-items: center; padding: 20px; }
+.modal { width: min(480px, 100%); padding: 20px; display: flex; flex-direction: column; gap: 14px; max-height: 88vh; overflow-y: auto; }
+.modal h2 { margin: 0; font-size: 17px; }
+
+@media (max-width: 780px) {
+  .panel { top: auto; left: 0; width: auto; height: 52vh; border-left: 0; border-top: 1px solid var(--line); border-radius: 14px 14px 0 0; }
+  /* On a phone the panel is a bottom sheet, so lift the toolbar instead. */
+  .planner.with-panel .top-right { right: 12px; }
+  .planner.with-panel .menu { right: 12px; }
+  .planner.with-panel .bottom { bottom: calc(52vh + 12px); transform: translateX(-50%); }
+  .hole-bar { overflow-x: auto; scrollbar-width: none; max-width: calc(100vw - 24px); }
+  .stats-course { display: none; }        /* no room beside the title on a phone */
+}
