@@ -1,5 +1,0 @@
-# Only needed if you deploy from GitHub Actions rather than connecting the repo
-# to Cloudflare directly. Change the project name to match what you created.
-name = "bolt6-course-planner"
-pages_build_output_dir = "dist"
-compatibility_date = "2026-09-01"
