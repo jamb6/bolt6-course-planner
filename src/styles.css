@@ -217,6 +217,13 @@ button { background: none; border: 0; cursor: pointer; }
   .hole-bar, .build-bar { overflow-x: auto; scrollbar-width: none; max-width: calc(100vw - 24px); }
   .hole-bar::-webkit-scrollbar, .build-bar::-webkit-scrollbar { display: none; }
   .stats-course { display: none; }        /* no room beside the title on a phone */
+
+  /* A list row with several actions does not fit across a phone: the label gets
+     squeezed to one word per line and the last button falls off the edge. Give
+     the label the full width and let the buttons wrap underneath it. */
+  .item { flex-wrap: wrap; }
+  .item .grow { flex: 1 1 100%; }
+  .item small { display: block; margin-top: 2px; }
 }
 
 /* ---------------------------------------------------------- slope shading -- */

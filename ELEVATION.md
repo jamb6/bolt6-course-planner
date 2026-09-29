@@ -1,11 +1,11 @@
-# Ground slope and tripod suitability
+# Ground slope and mast suitability
 
-A tripod has a levelling limit. Stand one on ground steeper than that and it
+A mast has a levelling limit. Stand one on ground steeper than that and it
 cannot be levelled, so a camera position that looks fine on a satellite photo
 turns out to be unusable when somebody walks it on the Monday.
 
 The planner can shade the ground by how steep it is, and tell you the slope
-under any tripod position you place. It needs an elevation file per course to do
+under any mast position you place. It needs an elevation file per course to do
 that, which you upload yourself.
 
 ---
@@ -22,7 +22,7 @@ the average tilt across a 30 m square. A green surround, a bunker face and the
 flat bit between them all land in one cell and average out to something gentle
 and wrong.
 
-For a tripod question you want something near 1 m. No global service offers
+For a mast question you want something near 1 m. No global service offers
 that, and the ones that do offer it are national programmes with their own
 formats and licences. So the app is source-agnostic: bring a GeoTIFF from
 wherever the venue's data actually comes from, and it will compute slope from
@@ -43,9 +43,28 @@ Ask for a **DTM / bare-earth / ground** model rather than a surface model. A
 surface model includes trees and buildings, which would show a canopy edge as a
 cliff.
 
+### The quickest US recipe
+
+USGS will clip a tile for you, so you do not have to download a whole 300 MB
+survey sheet. Put your course's bounding box into this URL and open it in a
+browser — it returns a GeoTIFF of exactly that ground:
+
+```
+https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage
+  ?bbox=<west>,<south>,<east>,<north>
+  &bboxSR=4326&size=2000,2000&format=tiff&pixelType=F32&f=image
+```
+
+A 2 km box at `size=2000,2000` gives you roughly 1 m cells in a file of about
+16 MB. `size` maxes out at 8000.
+
+Whole survey tiles work too — the app crops to the course and never reads more
+of the file than it needs, so a 10000 x 10000 tile costs the same memory as a
+small one.
+
 | Where | Source | Resolution |
 |---|---|---|
-| United States | USGS 3DEP, easiest via the OpenTopography API | 1 m over most populated areas |
+| United States | USGS 3DEP — see the recipe below | 1 m over most populated areas |
 | England | Environment Agency National LiDAR Programme | 1 m, national coverage |
 | Netherlands | AHN | 0.5 m |
 | France | IGN LiDAR HD | ~0.5 m, still rolling out |
@@ -81,24 +100,24 @@ would plan against it.
 
 ## Using it
 
-**Upload.** Course list → **Elevation** next to a located course → drop in the
-GeoTIFF. The app reports the cell size, the source projection, how much of the
-file has a reading, and what share of the ground is tripod-suitable.
+**Upload.** Open a course, then **Elevation** on any plan row → drop in the
+GeoTIFF. It is stored against the *course*, not the plan, so one upload serves
+every plan on that course.
 
 **Shade the map.** In the planner, the **Slope** button along the bottom.
 Green is fine, amber is within a degree of your limit, red is too steep, and
 unshaded means no reading.
 
-**Check one position.** Click a camera set to *Tripod* and the panel gives the
-slope under it and whether it will level. Towers, LED boards and hospitality
+**Check one position.** Click a camera set to *Mast* and the panel gives the
+slope under it and whether it will floor. Towers, LED boards and hospitality
 positions carry their own levelling, so they get no readout.
 
-**The limit.** Five degrees by default, adjustable from 1 to 20 either on the
-course's elevation screen or from the slider in the planner. It is a **per
-device** setting, not part of the plan: it describes the heads and legs actually
-in front of you, and a heavy box on a tall column runs out of level well before
-a light one on short legs. Drag it and watch the green retreat — that is how you
-find out whether a position is comfortably fine or only just.
+**The mast floor limit.** Five degrees by default, adjustable from 1 to 20
+either on the elevation screen or from the slider in the planner. It is a **per
+device** setting, not part of the plan: it describes the kit actually in front of
+you, and a heavy box on a tall column runs out of level well before a light one
+on short legs. Drag it and watch the green retreat — that is how you find out
+whether a position is comfortably fine or only just.
 
 ---
 
@@ -123,7 +142,7 @@ cache any Content," lists "Geodata extraction or resale" and "Offline uses"
 among prohibited uses, and requires that "3D objects aren't extracted, traced,
 or otherwise derived by hand or machine from Photorealistic 3D Tiles."
 
-Even setting the licence aside, they would not help with tripods. They are a
+Even setting the licence aside, they would not help with masts. They are a
 photogrammetric mesh from aerial imagery — a *surface* model, with trees,
 grandstands and roofs in it as though they were ground — at metre-level vertical
 accuracy, which is noise at the baseline slope is measured over. Google's own
@@ -141,13 +160,20 @@ GeoTIFF, for nothing.
 - The file is resampled onto a regular longitude/latitude grid and slope is
   computed per cell with **Horn's 3×3 method**, the same one GDAL and ArcGIS
   use.
-- Cell size follows the source up to a budget of 250,000 cells. A 1.5 km course
-  lands near 2–3 m. A tripod stands on about a metre of ground, so the shading
-  points at the flat areas rather than certifying a single leg.
+- The file is first **cropped to 1.5 km around the course**, and never read at
+  more than 3000 pixels per axis. That is what lets a whole survey tile work:
+  the cell budget is spent on the course rather than on the county, and memory
+  does not depend on the size of the file.
+- Cell size then follows the source up to a budget of 1.44 million cells, which
+  lands near 2.5 m over a 3 km box. Finer would not buy much — a 1 m survey DTM
+  is interpolated from a few returns per square metre, so slope detail below
+  about 2 m is mostly noise. A mast stands on roughly a metre of ground.
 - Slope is stored as one byte per cell at a quarter of a degree, **rounded up**
   so a stored figure never reads flatter than the ground is.
-- A whole course costs a few hundred kilobytes, and Postgres compresses that to
-  around 20 kB on disk. The source GeoTIFF is not kept.
+- A whole course costs 1–2 MB, which Postgres compresses to around 130 kB on
+  disk. The source GeoTIFF is not kept. On the localStorage fallback that is a
+  large share of the browser's quota, so a few courses will fill it — the app
+  says so plainly rather than failing silently.
 
 ## Accuracy
 
@@ -174,6 +200,10 @@ would be worse than not shading. Re-export as EPSG:4326 and it will load.
 
 **"Every pixel in this file is marked as no data"** — usually a tile from
 outside the survey's coverage.
+
+**"This file covers ground about N km from the course"** — the tile does not
+overlap the course at all, so there is nothing to crop to. Almost always the
+neighbouring sheet.
 
 **A warning that the file covers ground some kilometres from the course** —
 almost always the wrong tile. Check before planning against it.

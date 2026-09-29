@@ -12,7 +12,8 @@
 import * as local from './local.js';
 import * as supabase from './supabase.js';
 import { LPGA_SCHEDULE, LPGA_SEASON } from '../../data/lpgaCourses.js';
-import { TRIPOD_MAX_SLOPE_DEG, TRIPOD_SLOPE_RANGE } from '../../data/constants.js';
+import { MAST_MAX_SLOPE_DEG, MAST_SLOPE_RANGE } from '../../data/constants.js';
+import { migratePlans } from '../migrate.js';
 
 const useRemote = supabase.configured();
 const driver = useRemote ? supabase : local;
@@ -41,16 +42,16 @@ export const getUser = () => readLocal('b6.user', '');
 export const setUser = (n) => writeLocal('b6.user', n);
 
 /**
- * The tripod slope limit, in degrees. Device-local on purpose: it describes the
+ * The mast slope limit, in degrees. Device-local on purpose: it describes the
  * heads and legs actually in front of you, so a rigger carrying a heavy box on
  * a tall column and a planner at a desk can each hold the figure their own kit
  * manages. Clamped on read, so a hand-edited value cannot produce a plan shaded
  * against a nonsense limit.
  */
 export const getSlopeLimit = () => {
-  const v = Number(readLocal('b6.slopeLimit', TRIPOD_MAX_SLOPE_DEG));
-  const [lo, hi] = TRIPOD_SLOPE_RANGE;
-  return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : TRIPOD_MAX_SLOPE_DEG;
+  const v = Number(readLocal('b6.slopeLimit', MAST_MAX_SLOPE_DEG));
+  const [lo, hi] = MAST_SLOPE_RANGE;
+  return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : MAST_MAX_SLOPE_DEG;
 };
 export const setSlopeLimit = (deg) => writeLocal('b6.slopeLimit', deg);
 
@@ -70,7 +71,9 @@ export async function init() {
   const loaded = await driver.load();
   cache = {
     courses: loaded.courses ?? [],
-    plans: loaded.plans ?? [],
+    // Older plans carry field values the code has since renamed. One pass here
+    // means nothing downstream has to know the old names existed.
+    plans: migratePlans(loaded.plans ?? []),
     kits: loaded.kits ?? [],
   };
 
@@ -92,7 +95,7 @@ export async function init() {
 /** Pull the shared workspace again — how you see other people's changes. */
 export async function refresh() {
   const loaded = await driver.load();
-  cache = { courses: loaded.courses ?? [], plans: loaded.plans ?? [], kits: loaded.kits ?? [] };
+  cache = { courses: loaded.courses ?? [], plans: migratePlans(loaded.plans ?? []), kits: loaded.kits ?? [] };
   return cache;
 }
 

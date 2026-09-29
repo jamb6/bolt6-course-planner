@@ -1,14 +1,14 @@
 /** Every tunable and every colour lives here. No logic. */
 
 /** Cameras are one colour whatever they are mounted on — the badge letter
- *  carries the type, not the fill. Note the tower badge is ▲ rather than T,
- *  because tripod already owns T. */
+ *  carries the type, not the fill. Note the tower badge is ▲ rather than M,
+ *  so a mast and a tower never read alike at a glance. */
 export const CAMERA_COLOUR = '#FF3D71';
 
 export const CAMERA_TYPES = [
   // `badge` is what shows on the map, `mark` is what goes in the export —
   // the tower triangle reads better on screen, the caret survives a CSV.
-  { id: 'tripod', label: 'Tripod',      badge: 'T', mark: 'T' },
+  { id: 'mast',   label: 'Mast',        badge: 'M', mark: 'M' },
   { id: 'led',    label: 'LED board',   badge: 'L', mark: 'L' },
   { id: 'tower',  label: 'Tower',       badge: '▲', mark: '^' },
   { id: 'hospo',  label: 'Hospitality', badge: 'H', mark: 'H' },
@@ -66,13 +66,13 @@ export const MAP_STYLE = 'mapbox://styles/mapbox/satellite-streets-v12';
 /* ------------------------------------------------------- ground slope ----- */
 
 /**
- * The steepest ground a tripod can still be levelled on. Five degrees is the
+ * The steepest ground a mast can still be floored on. Five degrees is the
  * working figure; it is a setting rather than a constant because it belongs to
- * the head and the legs, not to the app — a heavy box on a tall column runs out
- * of level well before a light one on short legs.
+ * the kit, not to the app — a heavy box on a tall column runs out of level well
+ * before a light one on short legs.
  */
-export const TRIPOD_MAX_SLOPE_DEG = 5;
-export const TRIPOD_SLOPE_RANGE = [1, 20];
+export const MAST_MAX_SLOPE_DEG = 5;
+export const MAST_SLOPE_RANGE = [1, 20];
 
 /** Ground within this much of the limit is shown as marginal, not as fine. */
 export const SLOPE_MARGIN_DEG = 1;
@@ -87,12 +87,29 @@ export const SLOPE_MAX_DEG = 60;
 export const SLOPE_NO_DATA = 255;
 
 /**
- * Cell budget for a stored slope grid. A course is about 1.5 km across, so
- * 250k cells lands near 3 m — coarser than a 1 m LiDAR source, but a tripod
- * stands on about a metre of ground and the shading is there to point at the
- * flat areas, not to certify a single leg.
+ * Cell budget for a stored slope grid. With the file cropped to the course
+ * (DEM_RADIUS_M below), this lands near 2.5 m cells over a 3 km box.
+ *
+ * Finer would not buy much: a 1 m survey DTM is interpolated from a few returns
+ * per square metre, so genuine slope detail below about 2 m is mostly noise. A
+ * mast stands on roughly a metre of ground, and the shading is there to point
+ * at the flat areas rather than to certify one leg.
  */
-export const MAX_DEM_CELLS = 250000;
+export const MAX_DEM_CELLS = 1440000;
+
+/**
+ * How much ground around the course an elevation file is cropped to. A national
+ * survey tile is 10 km across and a course is 1.5 km of it; spending the cell
+ * budget on the whole tile would shade the course at 20 m and answer nothing.
+ */
+export const DEM_RADIUS_M = 1500;
+
+/**
+ * Most pixels pulled out of a GeoTIFF in one read, per axis. A USGS 1 m tile is
+ * 10000 x 10000, which is 400 MB as Float32 and takes the browser tab with it.
+ * This is comfortably more than MAX_DEM_CELLS needs, so nothing is lost.
+ */
+export const MAX_READ_PX = 3000;
 
 /** Shading colours. Deliberately unlike the cameras and the cables. */
 export const SLOPE_COLOURS = {

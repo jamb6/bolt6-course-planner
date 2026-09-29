@@ -210,7 +210,7 @@ export function addLayers(map) {
     },
     paint: { 'text-color': '#DEE7F0', 'text-halo-color': '#000000', 'text-halo-width': 1.8 },
   });
-  map.addLayer({          // camera type: T tripod, L LED, ▲ tower, H hospitality
+  map.addLayer({          // camera type: M mast, L LED, ▲ tower, H hospitality
     id: 'item-badge', type: 'symbol', source: SOURCES.items,
     filter: ['==', ['get', 'kind'], 'camera'],
     layout: {

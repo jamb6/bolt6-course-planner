@@ -3,7 +3,6 @@ import * as db from '../lib/db/index.js';
 import { geocode } from '../lib/geocode.js';
 import { fetchHoles } from '../lib/osm.js';
 import AddCourse from './AddCourse.jsx';
-import CourseElevation from './CourseElevation.jsx';
 import { LPGA_SEASON as season } from '../data/lpgaCourses.js';
 
 /**
@@ -17,7 +16,6 @@ export default function CoursePicker({ token, user, onPick, onSettings }) {
   const [courses, setCourses] = useState(db.getCourses);
   const [query, setQuery] = useState('');
   const [adding, setAdding] = useState(false);
-  const [elevationFor, setElevationFor] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [status, setStatus] = useState(null);
   const [progress, setProgress] = useState(null);
@@ -138,35 +136,21 @@ export default function CoursePicker({ token, user, onPick, onSettings }) {
 
         <div className="list">
           {visible.map((c) => (
-            <div key={c.id} className="item-row">
-              <button className="item grow" onClick={() => open(c)} disabled={busyId != null}>
-                <div className="grow">
-                  <b>{c.name}</b>
-                  <small>{[c.event, c.place, c.dates].filter(Boolean).join(' · ')}</small>
-                </div>
-                {c.major && <span className="tag accent">Major</span>}
-                {c.tbc && <span className="tag">Venue TBC</span>}
-                {c.holes?.length > 0 && <span className="tag">{c.holes.length} holes</span>}
-                {!c.lngLat && <span className="tag">Not located</span>}
-                <span>{busyId === c.id ? '…' : '›'}</span>
-              </button>
-              {/* Elevation needs the course located before a file can be checked
-                  against it, so it only appears once there are coordinates. */}
-              {c.lngLat && (
-                <button className="btn ghost" title={`Elevation for ${c.name}`}
-                        onClick={() => setElevationFor(c)}>
-                  Elevation
-                </button>
-              )}
-            </div>
+            <button key={c.id} className="item" onClick={() => open(c)} disabled={busyId != null}>
+              <div className="grow">
+                <b>{c.name}</b>
+                <small>{[c.event, c.place, c.dates].filter(Boolean).join(' · ')}</small>
+              </div>
+              {c.major && <span className="tag accent">Major</span>}
+              {c.tbc && <span className="tag">Venue TBC</span>}
+              {c.holes?.length > 0 && <span className="tag">{c.holes.length} holes</span>}
+              {!c.lngLat && <span className="tag">Not located</span>}
+              <span>{busyId === c.id ? '…' : '›'}</span>
+            </button>
           ))}
           {!visible.length && <div className="empty">No courses match “{query}”.</div>}
         </div>
       </div>
-
-      {elevationFor && (
-        <CourseElevation course={elevationFor} onClose={() => { setElevationFor(null); refresh(); }} />
-      )}
 
       {adding && (
         <AddCourse token={token} onCancel={() => setAdding(false)}

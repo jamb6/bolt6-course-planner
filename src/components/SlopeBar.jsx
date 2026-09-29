@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useStore } from '../store/useStore.js';
-import { SLOPE_COLOURS, SLOPE_MARGIN_DEG, TRIPOD_SLOPE_RANGE } from '../data/constants.js';
+import { SLOPE_COLOURS, SLOPE_MARGIN_DEG, MAST_SLOPE_RANGE } from '../data/constants.js';
 import { suitability } from '../lib/dem.js';
 
 const rgb = (c) => `rgb(${c[0]},${c[1]},${c[2]})`;
@@ -56,7 +56,7 @@ export default function SlopeBar() {
           <label htmlFor="slope-limit" className="slope-limit">
             <span>{limit}°</span>
             <input id="slope-limit" type="range"
-                   min={TRIPOD_SLOPE_RANGE[0]} max={TRIPOD_SLOPE_RANGE[1]} step={0.5}
+                   min={MAST_SLOPE_RANGE[0]} max={MAST_SLOPE_RANGE[1]} step={0.5}
                    value={limit} onChange={(e) => setSlopeLimit(Number(e.target.value))} />
           </label>
           <span className="slope-key">

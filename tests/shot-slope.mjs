@@ -39,20 +39,32 @@ for (const [label, viewport] of [
   await page.click('button[type=submit]');
   await page.waitForSelector('.item');
   await page.fill('#course-search', 'Pelican');
-  await page.waitForSelector('.item-row');
-
-  await page.locator('.item-row button:has-text("Elevation")').first().click();
-  await page.waitForSelector('[aria-label="Course elevation"]');
-  await page.setInputFiles('[aria-label="Course elevation"] input[type=file]',
-    path.resolve('tests/fixtures/pelican-synthetic-utm17n.tif'));
-  await page.waitForSelector('text=tripod-suitable', { timeout: 30000 });
-  await page.screenshot({ path: `tests/shot-slope-upload-${label}.png` });
-
-  await page.locator('[aria-label="Course elevation"] button:has-text("Close")').click();
-  await page.locator('.item-row .item').first().click();
+  await page.waitForSelector('.item');
+  await page.locator('.item').first().click();
   await page.waitForSelector('#plan-name');
   await page.fill('#plan-name', 'Slope');
   await page.click('button:has-text("Create")');
+  await page.waitForSelector('.slope-bar');
+
+  // Back to the plan list, where Elevation lives now.
+  await page.click('.top-right button:has-text("Menu")');
+  await page.click('button:has-text("Load a different course or plan")');
+  await page.waitForSelector('#course-search');
+  await page.fill('#course-search', 'Pelican');
+  await page.locator('.item').first().click();
+  await page.waitForSelector('.item button:has-text("Elevation")');
+  await page.screenshot({ path: `tests/shot-plan-row-${label}.png` });
+
+  await page.locator('.item button:has-text("Elevation")').first().click();
+  await page.waitForSelector('[aria-label="Course elevation"]');
+  await page.screenshot({ path: `tests/shot-elevation-empty-${label}.png` });
+  await page.setInputFiles('[aria-label="Course elevation"] input[type=file]',
+    path.resolve('tests/fixtures/pelican-synthetic-utm17n.tif'));
+  await page.waitForSelector('text=mast-suitable', { timeout: 30000 });
+  await page.screenshot({ path: `tests/shot-slope-upload-${label}.png` });
+
+  await page.locator('[aria-label="Course elevation"] button:has-text("Close")').click();
+  await page.locator('.item button:has-text("Open")').first().click();
   await page.waitForSelector('.slope-bar');
 
   await page.locator('.slope-bar button').first().click();

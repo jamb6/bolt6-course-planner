@@ -3,7 +3,7 @@
  *
  * The first half runs in plain Node against real GeoTIFFs, because the maths is
  * where a wrong answer would be invisible — shading that looks plausible and
- * puts a tripod on a bank. Reference figures come from pyproj and from an
+ * puts a mast on a bank. Reference figures come from pyproj and from an
  * independent numpy implementation of the same Horn method; the values below
  * are pinned so a future change has to justify itself.
  *
@@ -19,6 +19,7 @@ import { projectorFor } from '../src/lib/proj.js';
 import { buildDem, slopeAt, slopeBytes, suitability, cellAt, coversPoint, distanceToCoverageM } from '../src/lib/dem.js';
 import { slopeBand } from '../src/map/slopeLayer.js';
 import { buildSlopeRows, toCSV } from '../src/lib/exportPlan.js';
+import { migrateEntity, migratePlan, migratePlans } from '../src/lib/migrate.js';
 
 let pass = 0, fail = 0;
 const ok = (c, m, x = '') => { c ? (pass++, console.log('  PASS', m, x)) : (fail++, console.log('  FAIL', m, x)); };
@@ -92,9 +93,9 @@ for (const [dem, label] of [[utmDem, 'UTM source'], [geoDem, 'EPSG:4326 source']
   const b = slopeBytes(dem);
   let max = 0, sum = 0, n = 0;
   for (const v of b) { if (v === 255) continue; const d = v * 0.25; if (d > max) max = d; sum += d; n++; }
-  near(max, 14.5, 1.0, `${label}: steepest ground agrees with the numpy reference`);
-  near(sum / n, 1.21, 0.15, `${label}: mean slope agrees with the numpy reference`);
-  near(suitability(dem, 5).fraction * 100, 97.7, 1.0, `${label}: share under 5 deg agrees with the reference`);
+  near(max, 14.61, 0.3, `${label}: steepest ground agrees with the numpy reference`);
+  near(sum / n, 1.193, 0.08, `${label}: mean slope agrees with the numpy reference`);
+  near(suitability(dem, 5).fraction * 100, 97.68, 0.2, `${label}: share under 5 deg agrees with the reference`);
 }
 
 // The two projections describe the same ground, so they must agree with each
@@ -110,7 +111,7 @@ near(suitability(utmDem, 5).fraction, suitability(geoDem, 5).fraction, 0.005,
     if (f < prev - 1e-9) monotone = false;
     prev = f;
   }
-  ok(monotone, 'a higher tripod limit never shrinks the suitable area');
+  ok(monotone, 'a higher mast limit never shrinks the suitable area');
 }
 
 /* ======================================================== 3. no data ===== */
@@ -172,11 +173,11 @@ ok(slopeBand(12, 8) === 'steep', 'and still too steep at 12 deg');
 /* ======================================================== 5. sizes ======= */
 console.log('\nstored size');
 
-ok(utmDem.cols * utmDem.rows <= 250000,
+ok(utmDem.cols * utmDem.rows <= 1440000,
   'the stored grid stays inside the cell budget', `${utmDem.cols}x${utmDem.rows}`);
-ok(utmDem.slope.length < 700 * 1024,
+ok(utmDem.slope.length < 2.5 * 1024 * 1024,
   'the encoded grid is small enough to carry in a row', `${Math.round(utmDem.slope.length / 1024)} kB`);
-near(utmDem.cellM, 1.83, 0.3, 'cell size is derived from the area, not hard coded');
+near(utmDem.cellM, 1.0, 0.1, 'cell size is derived from the area, not hard coded');
 ok(utmDem.sourceM <= utmDem.cellM + 0.01,
   'the grid is never finer than the source it came from', `${utmDem.sourceM} -> ${utmDem.cellM}`);
 ok(utmDem.sourceCrs === 'UTM zone 17N', 'the source projection is recorded for the audit trail');
@@ -185,13 +186,84 @@ ok(JSON.parse(JSON.stringify(utmDem)).slope === utmDem.slope,
 ok(!('_bytes' in JSON.parse(JSON.stringify(utmDem))),
   'the decoded cache is not serialised into storage');
 
+/* ============================================ 5a. a whole survey tile ==== */
+console.log('\na 4 km survey tile, cropped to the course');
+
+// This is the shape a real USGS 3DEP download takes: kilometres of ground at
+// 1 m, most of it nowhere near the course. Three things have to hold — it must
+// not read the whole raster into memory, it must crop to the course rather than
+// spending the cell budget on the county, and the wrong tile must be refused.
+{
+  const PELICAN = [-82.8175, 27.9345];
+  const t0 = Date.now();
+  const big = await buildDem(buf('tile-4km-utm17n.tif'), { fileName: 'USGS_1M_17.tif', centre: PELICAN });
+  const ms = Date.now() - t0;
+
+  ok(big.windowPixels < big.sourcePixels * 0.6,
+     'only the part of the tile around the course is read',
+     `${(big.windowPixels / 1e6).toFixed(1)}M of ${(big.sourcePixels / 1e6).toFixed(1)}M px`);
+  ok(big.windowPixels <= 3000 * 3000,
+     'and never more than the read cap, whatever the file weighs',
+     `${(big.windowPixels / 1e6).toFixed(1)}M px`);
+  ok(big.cellM < 3.5,
+     'cropping buys metre-scale cells instead of spreading the budget over the whole tile',
+     `${big.cellM} m cells`);
+  ok(big.sourceM < 1.5, 'and the source is still reported at its true resolution', `${big.sourceM} m`);
+  ok(ms < 20000, 'a survey tile finishes in reasonable time', `${ms} ms`);
+
+  // The crop is centred on the course, so the course must be well inside it.
+  ok(coversPoint(big, PELICAN), 'the cropped grid covers the course');
+  ok(slopeAt(big, PELICAN) != null, 'and has a real reading at the course centre');
+
+  // The cap is what protects a sub-metre source, where the crop alone would
+  // still be 6000 px across. Reading the whole tile exercises the same path:
+  // 4096 px of source has to come back decimated, not whole.
+  const whole = await buildDem(buf('tile-4km-utm17n.tif'), { fileName: 'whole.tif' });
+  ok(whole.windowPixels <= 3000 * 3000 && whole.windowPixels < whole.sourcePixels,
+     'a read wider than the cap is decimated rather than pulled in whole',
+     `${(whole.windowPixels / 1e6).toFixed(1)}M of ${(whole.sourcePixels / 1e6).toFixed(1)}M px`);
+  ok(whole.sourceM > big.sourceM,
+     'and that decimation is reported honestly as a coarser source',
+     `whole tile ${whole.sourceM} m vs cropped ${big.sourceM} m`);
+
+  // Same tile, a course 40 km away: refused with something actionable.
+  let refused = null;
+  try { await buildDem(buf('tile-4km-utm17n.tif'), { centre: [-83.3, 27.9345] }); }
+  catch (err) { refused = err.message; }
+  ok(refused != null, 'a tile that misses the course is refused rather than shaded');
+  ok(/wrong tile/i.test(refused ?? ''), 'and the message says what is probably wrong', refused);
+}
+
+/* ================================================ 5b. the rename ========= */
+console.log('\nplans saved before the mast rename');
+
+// Plans are stored as documents, so renaming the mount type in the code does
+// not rename what is already in the database. Anything stored as a tripod has
+// to keep working, or a season of plans silently loses its masts.
+{
+  const old = { id: 'x', kind: 'camera', camType: 'tripod', hole: 1, position: 1, number: 4 };
+  ok(migrateEntity(old).camType === 'mast', 'a camera stored as a tripod reads back as a mast');
+  ok(migrateEntity({ ...old, camType: 'tower' }).camType === 'tower', 'other mount types are untouched');
+  ok(migrateEntity({ id: 'c', kind: 'cable', coords: [] }).kind === 'cable', 'non-cameras pass straight through');
+
+  const plan = migratePlan({ id: 'p', entities: [old, { id: 'y', kind: 'camera', camType: 'led' }] });
+  ok(plan.entities[0].camType === 'mast' && plan.entities[1].camType === 'led',
+     'a whole plan migrates, leaving everything else alone');
+  ok(migratePlans([]).length === 0, 'an empty workspace migrates to nothing');
+
+  // The export is what the crew carries, so an old plan must count correctly.
+  const rows = buildSlopeRows(plan.entities.map((e) => ({ ...e, coords: [-82.8175, 27.9345] })), utmDem, 5);
+  ok(rows.flagged.length + rows.fine === 1,
+     'and an old plan\u2019s masts are counted on the rigging sheet, not dropped');
+}
+
 /* ======================================================== 6. export ====== */
 console.log('\nrigging export');
 
 const cams = [
-  { id: 'a', kind: 'camera', label: 'CAM 1', hole: 1, position: 1, number: 1, camType: 'tripod', coords: [-82.8175, 27.9345] },
+  { id: 'a', kind: 'camera', label: 'CAM 1', hole: 1, position: 1, number: 1, camType: 'mast', coords: [-82.8175, 27.9345] },
   { id: 'b', kind: 'camera', label: 'CAM 2', hole: 1, position: 2, number: 2, camType: 'tower',  coords: [-82.8175, 27.9345] },
-  { id: 'c', kind: 'camera', label: 'CAM 3', hole: 2, position: 1, number: 3, camType: 'tripod', coords: [0, 0] },
+  { id: 'c', kind: 'camera', label: 'CAM 3', hole: 2, position: 1, number: 3, camType: 'mast', coords: [0, 0] },
 ];
 {
   const rows = buildSlopeRows(cams, utmDem, 5);
@@ -201,14 +273,14 @@ const cams = [
   const outside = rows.flagged.find((f) => f.entity.id === 'c');
   ok(outside && outside.verdict === 'Outside the elevation file',
     'a camera outside the file is flagged as unmeasured, not as suitable');
-  ok(rows.flagged.length + rows.fine === 2, 'every tripod is either flagged or counted as fine');
+  ok(rows.flagged.length + rows.fine === 2, 'every mast is either flagged or counted as fine');
 
   ok(buildSlopeRows(cams, null, 5) === null, 'with no elevation there is no slope section to build');
 
   const plan = { name: 'P', owner: 'J' }, course = { name: 'Pelican' };
   const withDem = toCSV(plan, course, cams, null, utmDem, 5);
   ok(withDem.includes('GROUND SLOPE'), 'the CSV carries a ground slope section');
-  ok(withDem.includes('tripod limit 5 deg'), 'the CSV records which limit it was checked against');
+  ok(withDem.includes('mast limit 5 deg'), 'the CSV records which limit it was checked against');
   ok(withDem.includes('pelican-3dep-1m.tif'), 'the CSV names the file the slope came from');
 
   const without = toCSV(plan, course, cams, null, null, 5);
@@ -249,41 +321,62 @@ await page.waitForSelector('.item');
 
 // Open a located course. Pelican is seeded with coordinates.
 await page.fill('#course-search', 'Pelican');
-await page.waitForSelector('.item-row');
+await page.waitForSelector('.item');
 
-ok(await page.locator('.item-row button:has-text("Elevation")').first().isVisible(),
-  'a located course offers an Elevation button');
+ok(!(await page.locator('.item button:has-text("Elevation")').count()),
+  'the course list no longer carries an Elevation button');
 
-await page.locator('.item-row button:has-text("Elevation")').first().click();
+// Into the course, then make a plan. Elevation lives on the plan row now.
+await page.locator('.item').first().click();
+await page.waitForSelector('#plan-name', { timeout: 20000 });
+await page.fill('#plan-name', 'Slope test');
+await page.click('button:has-text("Create")');
+await page.waitForSelector('.slope-bar', { timeout: 20000 });
+
+// Back out to the course list, then into the course again — that is the plan
+// list, where Elevation now lives.
+await page.click('.top-right button:has-text("Menu")');
+await page.click('button:has-text("Load a different course or plan")');
+await page.waitForSelector('#course-search', { timeout: 20000 });
+await page.fill('#course-search', 'Pelican');
+await page.locator('.item').first().click();
+await page.waitForSelector('.item button:has-text("Open")', { timeout: 20000 });
+ok(await page.locator('.item button:has-text("Elevation")').first().isVisible(),
+  'a plan row carries the Elevation button');
+
+await page.locator('.item button:has-text("Elevation")').first().click();
 await page.waitForSelector('[aria-label="Course elevation"]');
-ok(await page.locator('text=No elevation for this course').first().isVisible(),
-  'a course with no file says so plainly');
+ok(await page.locator('text=Applies to every plan on this course').first().isVisible(),
+  'and says the file is shared by every plan on the course, not owned by one');
+ok(await page.locator('[aria-label="Course elevation"] button:has-text("Upload GeoTIFF")').isVisible(),
+  'with nothing uploaded the button offers an upload');
+ok(/mast floor limit/i.test(await page.locator('[aria-label="Course elevation"]').innerText()),
+  'the slider is labelled Mast floor limit');
 
 // Upload the real GeoTIFF through the real file input.
 await page.setInputFiles('[aria-label="Course elevation"] input[type=file]',
   path.join(FIX, 'pelican-synthetic-utm17n.tif'));
-await page.waitForSelector('text=tripod-suitable', { timeout: 30000 });
+await page.waitForSelector('text=mast-suitable', { timeout: 30000 });
 const summary = await page.locator('[aria-label="Course elevation"] .banner').first().innerText();
-ok(/\d+% of the file has a reading/.test(summary), 'the summary reports coverage', summary.split('\n').join(' | '));
-ok(/tripod-suitable at 5°/.test(summary), 'the summary reports suitability at the 5 deg default');
+ok(/\d+% covered/.test(summary), 'the summary reports coverage', summary.split('\n').join(' | '));
+ok(/\d+% mast-suitable/.test(summary), 'and how much of it a mast can stand on');
 
 // Move the limit and watch the figure change.
-const before = Number(summary.match(/(\d+)%\s*tripod-suitable/)?.[1] ?? -1);
+const before = Number(summary.match(/(\d+)%\s*mast-suitable/)?.[1] ?? -1);
 await page.locator('#dem-limit').fill('2');
-await page.waitForFunction(() =>
-  !/at 5°/.test(document.querySelector('[aria-label="Course elevation"] .banner')?.textContent ?? ''));
+await page.waitForFunction((b) => {
+  const m = document.querySelector('[aria-label="Course elevation"] .banner')?.textContent?.match(/(\d+)%\s*mast-suitable/);
+  return m && Number(m[1]) !== b;
+}, before, { timeout: 10000 });
 const after = Number((await page.locator('[aria-label="Course elevation"] .banner').first().innerText())
-  .match(/(\d+)%\s*tripod-suitable/)?.[1] ?? -1);
+  .match(/(\d+)%\s*mast-suitable/)?.[1] ?? -1);
 ok(after < before, 'tightening the limit reduces the suitable area', `${before}% -> ${after}%`);
 await page.locator('#dem-limit').fill('5');
 
 await page.locator('[aria-label="Course elevation"] button:has-text("Close")').click();
 
-// Into a plan.
-await page.locator('.item-row .item').first().click();
-await page.waitForSelector('#plan-name', { timeout: 20000 });
-await page.fill('#plan-name', 'Slope test');
-await page.click('button:has-text("Create")');
+// Open the plan we made.
+await page.locator('.item button:has-text("Open")').first().click();
 await page.waitForSelector('.slope-bar', { timeout: 20000 });
 
 ok(await page.locator('.slope-bar button:has-text("Slope")').isEnabled(),
@@ -317,9 +410,9 @@ ok(layer.corners.length === 4 && Math.abs(layer.corners[0][0] - (-82.8221)) < 0.
 const updates0 = await page.evaluate(() => window.__map.getSource('slope').updates);
 await page.locator('#slope-limit').fill('12');
 await page.waitForFunction((n) => window.__map.getSource('slope').updates > n, updates0, { timeout: 10000 });
-ok(true, 'changing the tripod limit repaints the shading');
+ok(true, 'changing the mast limit repaints the shading');
 
-// A tripod on the map reports its ground slope; a tower does not.
+// A mast on the map reports its ground slope; a tower does not.
 await page.locator('#slope-limit').fill('5');
 await page.click('.hole-btn[data-hole="1"]');
 await page.waitForTimeout(150);
@@ -330,7 +423,7 @@ await page.evaluate(() => window.__map.fire('click', { x: 700, y: 475 }));
 await page.waitForSelector('.panel', { timeout: 10000 });
 
 const camPanel = await page.locator('.panel').innerText();
-ok(/ground slope/i.test(camPanel), 'a tripod camera shows the ground slope under it',
+ok(/ground slope/i.test(camPanel), 'a mast camera shows the ground slope under it',
   camPanel.split('\n').filter((l) => /°|level|steep/i.test(l)).join(' | '));
 
 await page.selectOption('#cam-type', 'tower');
@@ -339,7 +432,7 @@ await page.waitForFunction(() => !/ground slope/i.test(document.querySelector('.
   .catch(() => ok(false, 'switching to a tower should drop the slope readout'));
 
 /* ---- 3D view: context only, and it must say so --------------------------- */
-await page.selectOption('#cam-type', 'tripod');
+await page.selectOption('#cam-type', 'mast');
 ok(await page.evaluate(() => window.__map.getTerrain() == null), 'the map starts flat');
 
 await page.click('.top-right button:has-text("3D")');
@@ -412,7 +505,7 @@ ok(await page.evaluate(() => !!window.__map.getSource('mapbox-dem')),
   'the elevation source is kept, so toggling back does not refetch tiles');
 
 // And with the elevation removed, the map must go back to showing nothing.
-await page.selectOption('#cam-type', 'tripod');
+await page.selectOption('#cam-type', 'mast');
 await page.evaluate(async () => {
   const s = window.__b6.store.getState();
   s.setDem(null);

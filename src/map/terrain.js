@@ -3,7 +3,7 @@
  *
  * This is for looking at, not for measuring. The heights come from Mapbox's
  * global elevation tileset, which tops out around 5 to 10 m per pixel — plenty
- * to read the shape of a course, nowhere near enough to answer a tripod
+ * to read the shape of a course, nowhere near enough to answer a mast
  * question. The slope shading is the thing that answers that, and it comes from
  * the elevation file uploaded against the course (see lib/dem.js).
  *

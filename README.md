@@ -126,8 +126,8 @@ cameras on it is dimmed, so what is left to do reads at a glance. `All` zooms
 back out to the whole course.
 
 **Cameras** are one colour whatever they are mounted on; the small letter next
-to each one says which — `T` tripod, `L` LED board, `▲` tower, `H`
-hospitality. (Tower is a triangle rather than a T because tripod already owns
+to each one says which — `T` mast, `L` LED board, `▲` tower, `H`
+hospitality. (Tower is a triangle rather than a T because mast already owns
 that letter.)
 
 Each camera carries **two identifiers, and they are not the same thing**:
@@ -220,15 +220,15 @@ what is on the table:
 position, each cell carrying the camera number and its mounting mark.
 
 ```
-Hole,g01,g02,g03,Tripods
+Hole,g01,g02,g03,Masts
 1,"1 ^","3 T","6 T",2
 2,"","","7 T",1
 3,"","","",0
 ```
 
-`T` tripod, `L` LED board, `^` tower, `H` hospitality — the key is printed at
+`T` mast, `L` LED board, `^` tower, `H` hospitality — the key is printed at
 the foot of the sheet. Every hole gets a row whether or not anything is planned
-on it, and the Tripods column is what the hole needs carrying out to it.
+on it, and the Masts column is what the hole needs carrying out to it.
 
 Any camera missing a hole or a position is listed under the grid rather than
 dropped silently, so a half-finished plan says so.
@@ -298,10 +298,12 @@ is a backend the two ends will agree.
 
 ## Ground slope
 
-Upload a GeoTIFF per course and the map shades the ground by how steep it is,
-so you can see where a tripod will level before anyone walks the course. Click
-a tripod position and the panel gives the slope under it against your limit —
-5 degrees by default, adjustable per device.
+Upload a GeoTIFF from the **Elevation** button on any plan row and the map
+shades the ground by how steep it is, so you can see where a mast will floor
+before anyone walks the course. The file is stored against the course, so one
+upload serves every plan on it. Click a mast position and the panel gives the
+slope under it against your **mast floor limit** — 5 degrees by default,
+adjustable per device.
 
 The rule the whole feature is built on: **ground is never shown as flat unless
 it was measured as flat.** No file means no shading; a gap in a file stays a
@@ -351,11 +353,15 @@ extending a run from the (+), inserting a joint by clicking the line, pinned
 points following a moved node, marker icons, hover notes, Move, WASD, CSV
 export and persistence across a reload.
 
+A rename is in `src/lib/migrate.js`: cameras were called tripods in the first
+builds and are now masts. Plans are stored as documents, so every entity is run
+through a migration on the way into the app and an old plan keeps its masts.
+
 Four more suites cover what is hard to reproduce by hand: `osm.mjs` for
 OpenStreetMap rate-limiting, hanging and cancellation; `layout.mjs` for
 building a hole layout from nothing; `writes.mjs` for the write batching that
 keeps two people from overwriting each other; and `slope.mjs` for the elevation
-pipeline. 216 assertions in total.
+pipeline. 241 assertions in total.
 
 `slope.mjs` is checked against outside references rather than against itself:
 the projections against **pyproj**, the slope computation against an
@@ -364,7 +370,7 @@ GeoTIFFs in `tests/fixtures/`. It also drives the whole feature in a browser —
 upload a file, shade the map, read a camera's slope, remove the file and watch
 the shading go. That matters because the failure mode here is silent: shading
 that looks plausible and is in the wrong place would send somebody to a bank
-with a tripod.
+with a mast.
 
 `vite.config.test.js` swaps `mapbox-gl` for `tests/mapbox-mock.js`, so the
 suites run the real application code without a token or a network. The
@@ -375,7 +381,7 @@ OpenStreetMap and geocoding calls are intercepted with fixtures.
 - **Sharing** downloads a `.b6plan.json` file that the other person imports
   from the plan screen. There is no backend, so there are no accounts and no
   live collaboration.
-- **Camera types** (tripod / LED / tower / hospitality) are set by hand. They
+- **Camera types** (mast / LED / tower / hospitality) are set by hand. They
   are meant to be set automatically from whatever fixture a camera is snapped
   to, once fixture and building plans are imported. The pinning model the
   cables already use is the same mechanism that will carry that.

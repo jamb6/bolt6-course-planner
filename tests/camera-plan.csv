@@ -2,11 +2,11 @@ Plan,"ANNIKA 2027 — camera plan"
 Course,"Pelican Golf Club"
 Owner,"Jam"
 Kit,"Tour kit A"
-Exported,2026-09-29T21:01:25.652Z
+Exported,2026-09-29T21:42:21.490Z
 
-Hole,g01,g02,g03,Tripods
-1,"1 ^","3 T","6 T",2
-2,"","","7 T",1
+Hole,g01,g02,g03,Masts
+1,"1 ^","3 M","6 M",2
+2,"","","7 M",1
 3,"","","",0
 4,"","","",0
 5,"","","",0
@@ -26,4 +26,4 @@ Hole,g01,g02,g03,Tripods
 
 TOTAL,"4 cameras",,,3
 
-Mounting,T tripod,L LED board,^ tower,H hospitality
+Mounting,M mast,L LED board,^ tower,H hospitality

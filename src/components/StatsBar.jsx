@@ -16,7 +16,7 @@ export default function StatsBar({ scope = 'course' }) {
 
   const stats = [
     { value: t.cameras, label: 'Cameras' },
-    { value: t.tripods, label: 'Tripods' },
+    { value: t.masts, label: 'Masts' },
     { value: t.cableBuckets.short, label: '0–50 m' },
     { value: t.cableBuckets.mid, label: '50–100 m' },
   ];

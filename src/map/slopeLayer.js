@@ -16,7 +16,7 @@ import { slopeBytes } from '../lib/dem.js';
 export const SLOPE_SOURCE = 'slope';
 export const SLOPE_LAYER = 'slope-fill';
 
-/** Which band a slope reading falls in, given the tripod limit in force. */
+/** Which band a slope reading falls in, given the mast limit in force. */
 export function slopeBand(deg, limitDeg) {
   if (deg == null) return null;
   if (deg > limitDeg) return 'steep';
@@ -27,8 +27,8 @@ export function slopeBand(deg, limitDeg) {
 /**
  * Turns the slope grid into a PNG data URL.
  *
- * Re-run whenever the tripod limit changes, because the limit is what decides
- * the colours — the stored grid holds degrees and knows nothing about tripods.
+ * Re-run whenever the mast limit changes, because the limit is what decides
+ * the colours — the stored grid holds degrees and knows nothing about masts.
  */
 export function slopeImageURL(dem, limitDeg) {
   const bytes = slopeBytes(dem);
@@ -100,6 +100,6 @@ export function syncSlopeLayer(map, dem, limitDeg, visible) {
   }
 
   // Already there: repaint it. updateImage takes both, so a new course's grid
-  // and a changed tripod limit go through the same path.
+  // and a changed mast limit go through the same path.
   map.getSource(SLOPE_SOURCE).updateImage({ url, coordinates: corners(dem) });
 }

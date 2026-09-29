@@ -123,9 +123,9 @@ export default function EntityPanel({ onMove }) {
               </select>
             </div>
 
-            {/* Ground slope only decides anything for a tripod. A tower, an LED
+            {/* Ground slope only decides anything for a mast. A tower, an LED
                 board or a hospitality position carries its own levelling. */}
-            {entity.camType === 'tripod' && (
+            {entity.camType === 'mast' && (
               <GroundSlope dem={dem} demState={demState} limit={slopeLimit} coords={entity.coords} />
             )}
 
@@ -209,7 +209,7 @@ export default function EntityPanel({ onMove }) {
 }
 
 /**
- * What the ground is doing under one tripod.
+ * What the ground is doing under one mast.
  *
  * Four outcomes, and the two "no reading" ones are the point of the thing: a
  * camera outside the uploaded file's area, or over a gap in it, gets told so
@@ -254,10 +254,10 @@ function GroundSlope({ dem, demState, limit, coords }) {
       ground slope, against a {limit}° limit.
       <div style={{ marginTop: 4 }}>
         {band === 'steep'
-          ? 'Too steep for a tripod here — move it or change the mounting.'
+          ? 'Too steep for a mast here — move it or change the mounting.'
           : band === 'near'
             ? 'Close to the limit. Worth a look on the ground before you commit to it.'
-            : 'A tripod will level here.'}
+            : 'A mast will level here.'}
         {' '}Measured over {dem.cellM} m cells.
       </div>
     </div>

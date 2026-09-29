@@ -2,10 +2,10 @@
  * The rigging breakdown.
  *
  * This is the sheet the crew carries: for each hole, which camera numbers are
- * on it, how many tripods to bring, and how much cable of each type.
+ * on it, how many masts to bring, and how much cable of each type.
  */
 import { CABLE_TYPES, CABLE_BUCKETS, CAMERA_TYPES, POSITIONS_PER_HOLE,
-         SLOPE_MARGIN_DEG, TRIPOD_MAX_SLOPE_DEG } from '../data/constants.js';
+         SLOPE_MARGIN_DEG, MAST_MAX_SLOPE_DEG } from '../data/constants.js';
 import { fmtM } from './geo.js';
 import { positionId } from './cameraNumber.js';
 import { slopeAt, coversPoint } from './dem.js';
@@ -25,7 +25,7 @@ export function buildBreakdown(entities) {
         cameraNumbers: [],
         positions: [],
         cameras: 0,
-        tripods: 0,
+        masts: 0,
         switches: 0,
         markers: 0,
         cables: 0,
@@ -42,7 +42,7 @@ export function buildBreakdown(entities) {
       r.cameras += 1;
       if (e.number != null) r.cameraNumbers.push(e.number);
       if (e.position != null) r.positions.push(e.position);
-      if (e.camType === 'tripod') r.tripods += 1;
+      if (e.camType === 'mast') r.masts += 1;
     } else if (e.kind === 'switch') {
       r.switches += 1;
     } else if (e.kind === 'marker') {
@@ -73,7 +73,7 @@ export function buildTotals(entities) {
 
   return {
     cameras: entities.filter((e) => e.kind === 'camera').length,
-    tripods: entities.filter((e) => e.kind === 'camera' && e.camType === 'tripod').length,
+    masts: entities.filter((e) => e.kind === 'camera' && e.camType === 'mast').length,
     switches: entities.filter((e) => e.kind === 'switch').length,
     markers: entities.filter((e) => e.kind === 'marker').length,
     cables: cables.length,
@@ -85,7 +85,7 @@ export function buildTotals(entities) {
   };
 }
 
-export function toCSV(plan, course, entities, kit, dem = null, limitDeg = TRIPOD_MAX_SLOPE_DEG) {
+export function toCSV(plan, course, entities, kit, dem = null, limitDeg = MAST_MAX_SLOPE_DEG) {
   const rows = buildBreakdown(entities);
   const totals = buildTotals(entities);
   const cableCols = CABLE_TYPES.map((t) => `${t.label} (m)`);
@@ -98,7 +98,7 @@ export function toCSV(plan, course, entities, kit, dem = null, limitDeg = TRIPOD
     `Cameras out of service,${JSON.stringify((kit?.unavailable ?? []).join(' '))}`,
     `Exported,${new Date().toISOString()}`,
     '',
-    ['Hole', 'Positions', 'Camera numbers', 'Cameras', 'Tripods', 'Switches', 'Markers', 'Cables', ...cableCols, 'Notes'].join(','),
+    ['Hole', 'Positions', 'Camera numbers', 'Cameras', 'Masts', 'Switches', 'Markers', 'Cables', ...cableCols, 'Notes'].join(','),
   ];
 
   for (const r of rows) {
@@ -108,7 +108,7 @@ export function toCSV(plan, course, entities, kit, dem = null, limitDeg = TRIPOD
         JSON.stringify(r.positions.map((p) => positionId(r.hole, p) ?? `g${String(p).padStart(2, '0')}`).join(' ')),
         JSON.stringify(r.cameraNumbers.join(' ')),
         r.cameras,
-        r.tripods,
+        r.masts,
         r.switches,
         r.markers,
         r.cables,
@@ -120,7 +120,7 @@ export function toCSV(plan, course, entities, kit, dem = null, limitDeg = TRIPOD
 
   lines.push('');
   lines.push(
-    ['TOTAL', '', '', totals.cameras, totals.tripods, totals.switches, totals.markers, totals.cables,
+    ['TOTAL', '', '', totals.cameras, totals.masts, totals.switches, totals.markers, totals.cables,
       ...CABLE_TYPES.map((t) =>
         Math.round(rows.reduce((sum, r) => sum + (r.cableMetres[t.id] || 0), 0))),
       JSON.stringify(`${fmtM(totals.totalCableM)} m of cable total`)].join(',')
@@ -130,7 +130,7 @@ export function toCSV(plan, course, entities, kit, dem = null, limitDeg = TRIPOD
   if (slope) {
     lines.push('');
     lines.push(['GROUND SLOPE',
-      JSON.stringify(`tripod limit ${slope.limitDeg} deg`),
+      JSON.stringify(`mast limit ${slope.limitDeg} deg`),
       JSON.stringify(`${slope.dem.fileName || 'uploaded elevation'}, ${slope.dem.cellM} m cells`)].join(','));
     lines.push(['Position', 'Camera', 'Slope (deg)', 'Verdict'].join(','));
     for (const f of slope.flagged) {
@@ -142,7 +142,7 @@ export function toCSV(plan, course, entities, kit, dem = null, limitDeg = TRIPOD
       ].join(','));
     }
     lines.push(['', '', '',
-      JSON.stringify(`${slope.fine} tripod position(s) comfortably inside the limit`)].join(','));
+      JSON.stringify(`${slope.fine} mast position(s) comfortably inside the limit`)].join(','));
   } else {
     // Said out loud, because a missing section reads as "all clear".
     lines.push('');
@@ -153,7 +153,7 @@ export function toCSV(plan, course, entities, kit, dem = null, limitDeg = TRIPOD
 }
 
 /**
- * The tripod slope section of the rigging breakdown.
+ * The mast slope section of the rigging breakdown.
  *
  * Only the positions that need a decision are listed: too steep, close to the
  * limit, or unmeasured. Everything that is comfortably fine is a count, because
@@ -168,7 +168,7 @@ export function buildSlopeRows(entities, dem, limitDeg) {
   let fine = 0;
 
   for (const e of entities) {
-    if (e.kind !== 'camera' || e.camType !== 'tripod') continue;
+    if (e.kind !== 'camera' || e.camType !== 'mast') continue;
     const outside = !coversPoint(dem, e.coords);
     const deg = outside ? null : slopeAt(dem, e.coords);
 
@@ -205,7 +205,7 @@ const markFor = (camType) => CAMERA_TYPES.find((t) => t.id === camType)?.mark ??
 
 /**
  * The camera plan: a row per hole, a column per position, each cell holding
- * the camera number and its mounting mark (T tripod, L LED, ^ tower,
+ * the camera number and its mounting mark (M mast, L LED, ^ tower,
  * H hospitality). Empty positions stay blank. This is the sheet the crew
  * works from, so it mirrors the paper layout rather than the data model.
  *
@@ -213,7 +213,7 @@ const markFor = (camType) => CAMERA_TYPES.find((t) => t.id === camType)?.mark ??
  * listed underneath rather than dropped silently.
  */
 export function buildCameraPlan(entities, holeNumbers) {
-  const grid = new Map(holeNumbers.map((n) => [n, { hole: n, cells: [], tripods: 0 }]));
+  const grid = new Map(holeNumbers.map((n) => [n, { hole: n, cells: [], masts: 0 }]));
   const orphans = [];
 
   for (const e of entities) {
@@ -226,7 +226,7 @@ export function buildCameraPlan(entities, holeNumbers) {
     row.cells[e.position - 1] = e.number != null
       ? `${e.number} ${markFor(e.camType)}`
       : `— ${markFor(e.camType)}`;
-    if (e.camType === 'tripod') row.tripods += 1;
+    if (e.camType === 'mast') row.masts += 1;
   }
 
   return { rows: [...grid.values()], orphans };
@@ -243,20 +243,20 @@ export function toCameraPlanCSV(plan, course, entities, kit, holeNumbers) {
     `Kit,${JSON.stringify(kit?.name || '')}`,
     `Exported,${new Date().toISOString()}`,
     '',
-    ['Hole', ...positions, 'Tripods'].join(','),
+    ['Hole', ...positions, 'Masts'].join(','),
   ];
 
   for (const r of rows) {
     const cells = Array.from({ length: POSITIONS_PER_HOLE }, (_, i) => JSON.stringify(r.cells[i] ?? ''));
-    lines.push([r.hole, ...cells, r.tripods].join(','));
+    lines.push([r.hole, ...cells, r.masts].join(','));
   }
 
   const totalCams = rows.reduce((n, r) => n + r.cells.filter(Boolean).length, 0);
-  const totalTripods = rows.reduce((n, r) => n + r.tripods, 0);
+  const totalMasts = rows.reduce((n, r) => n + r.masts, 0);
   lines.push('');
-  lines.push(['TOTAL', JSON.stringify(`${totalCams} cameras`), '', '', totalTripods].join(','));
+  lines.push(['TOTAL', JSON.stringify(`${totalCams} cameras`), '', '', totalMasts].join(','));
   lines.push('');
-  lines.push('Mounting,T tripod,L LED board,^ tower,H hospitality');
+  lines.push('Mounting,M mast,L LED board,^ tower,H hospitality');
 
   if (orphans.length) {
     lines.push('');

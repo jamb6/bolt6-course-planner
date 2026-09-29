@@ -1,7 +1,7 @@
 /**
  * Elevation in, ground slope out.
  *
- * A tripod has a levelling limit. Standing one on ground steeper than that
+ * A mast has a levelling limit. Standing one on ground steeper than that
  * means it cannot be levelled, so the planner needs to know where the flat
  * ground is before anyone walks the course. That is a slope question, not an
  * elevation question, and slope is the derivative of elevation — it needs far
@@ -23,7 +23,8 @@
  * that looks trustworthy.
  */
 import { projectorFor, SUPPORTED_CRS } from './proj.js';
-import { MAX_DEM_CELLS, SLOPE_STEP_DEG, SLOPE_NO_DATA, SLOPE_MAX_DEG } from '../data/constants.js';
+import { MAX_DEM_CELLS, MAX_READ_PX, DEM_RADIUS_M,
+         SLOPE_STEP_DEG, SLOPE_NO_DATA, SLOPE_MAX_DEG } from '../data/constants.js';
 
 const D2R = Math.PI / 180;
 
@@ -68,16 +69,99 @@ export async function readGeoTiff(arrayBuffer) {
   const height = image.getHeight();
   if (!width || !height) throw new Error('This GeoTIFF has no pixels in it.');
 
-  const rasters = await image.readRasters({ interleave: false });
-  const band = rasters[0];
-  if (!band) throw new Error('This GeoTIFF has no raster band to read.');
-
   // GDAL writes the no-data value as a string in the TIFF tags. It is usually
   // a large negative sentinel such as -9999 or -3.4e38.
   const rawNoData = image.getGDALNoData?.();
   const noData = rawNoData == null || Number.isNaN(Number(rawNoData)) ? null : Number(rawNoData);
 
-  return { width, height, band, noData, originX, originY, resX, resY, proj, epsg: proj.epsg };
+  // Pixels are deliberately not read here. A national survey tile is 10000 x
+  // 10000, which is 400 MB as Float32 and takes the browser tab with it, so the
+  // caller picks a window first and only that is pulled into memory.
+  return { image, width, height, noData, originX, originY, resX, resY, proj, epsg: proj.epsg };
+}
+
+/**
+ * True ground resolution of a source pixel, in metres.
+ *
+ * Measured rather than read off the header, because a header figure is in
+ * whatever units the projection uses and those are not always real metres —
+ * Web Mercator's "metres" are stretched by 1/cos(latitude), which at this
+ * latitude overstates the resolution by about 13%. Stepping one pixel and
+ * measuring the ground distance is right for every projection without a table
+ * of special cases.
+ */
+function nativeGroundM(src) {
+  const cx = src.originX + (src.width / 2) * src.resX;
+  const cy = src.originY + (src.height / 2) * src.resY;
+  const at = (x, y) => src.proj.inverse([x, y]);
+  const [lng0, lat0] = at(cx, cy);
+  const [lngX, latX] = at(cx + src.resX, cy);
+  const [lngY, latY] = at(cx, cy + src.resY);
+  const mLat = mPerDegLat(lat0), mLng = mPerDegLng(lat0);
+  const dx = Math.hypot((lngX - lng0) * mLng, (latX - lat0) * mLat);
+  const dy = Math.hypot((lngY - lng0) * mLng, (latY - lat0) * mLat);
+  return Math.min(dx, dy);
+}
+
+/**
+ * Reads just the part of the file we need, at a bounded pixel count.
+ *
+ * Two jobs. It crops to the window the course actually occupies, so uploading a
+ * whole survey tile still gives fine cells over the course instead of coarse
+ * ones over a county. And it caps how many pixels come back, so a file of any
+ * size costs the same memory.
+ *
+ * The decimation is nearest-neighbour on purpose: averaging during the read
+ * would blend a no-data sentinel into its neighbours and manufacture a cliff at
+ * the edge of every gap.
+ */
+async function readWindow(src, box, maxPx = MAX_READ_PX) {
+  const { originX, originY, resX, resY, width, height, proj } = src;
+
+  // The lon/lat box, in this file's own pixel coordinates.
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [lng, lat] of [[box.west, box.north], [box.east, box.north],
+                            [box.east, box.south], [box.west, box.south]]) {
+    const [x, y] = proj.forward([lng, lat]);
+    const px = (x - originX) / resX;
+    const py = (y - originY) / resY;
+    x0 = Math.min(x0, px); x1 = Math.max(x1, px);
+    y0 = Math.min(y0, py); y1 = Math.max(y1, py);
+  }
+
+  // One pixel of margin, then clamp to the file.
+  const left = Math.max(0, Math.floor(x0) - 1);
+  const top = Math.max(0, Math.floor(y0) - 1);
+  const right = Math.min(width, Math.ceil(x1) + 1);
+  const bottom = Math.min(height, Math.ceil(y1) + 1);
+  if (right - left < 2 || bottom - top < 2) {
+    throw new Error('This elevation file does not cover the course. Check it is the right tile.');
+  }
+
+  const winW = right - left, winH = bottom - top;
+  const scale = Math.min(1, maxPx / Math.max(winW, winH));
+  const readW = Math.max(2, Math.round(winW * scale));
+  const readH = Math.max(2, Math.round(winH * scale));
+
+  const rasters = await src.image.readRasters({
+    interleave: false,
+    window: [left, top, right, bottom],
+    width: readW, height: readH,
+    resampleMethod: 'nearest',
+  });
+  const band = rasters[0];
+  if (!band) throw new Error('This GeoTIFF has no raster band to read.');
+
+  return {
+    ...src,
+    band,
+    width: readW,
+    height: readH,
+    originX: originX + left * resX,
+    originY: originY + top * resY,
+    resX: resX * (winW / readW),
+    resY: resY * (winH / readH),
+  };
 }
 
 /* ------------------------------------------------- resample to lon/lat ---- */
@@ -108,6 +192,22 @@ function lngLatBounds(src) {
 }
 
 /**
+ * The file's ground, narrowed to a box around the course. Null when the two do
+ * not overlap at all, which is how the wrong tile gets caught.
+ */
+function clipBox(fileBox, [lng, lat], radiusM) {
+  const dLat = radiusM / mPerDegLat(lat);
+  const dLng = radiusM / mPerDegLng(lat);
+  const box = {
+    west: Math.max(fileBox.west, lng - dLng),
+    east: Math.min(fileBox.east, lng + dLng),
+    south: Math.max(fileBox.south, lat - dLat),
+    north: Math.min(fileBox.north, lat + dLat),
+  };
+  return box.east > box.west && box.north > box.south ? box : null;
+}
+
+/**
  * Builds a regular longitude/latitude elevation grid by sampling the source.
  *
  * Bilinear, and strict about gaps: if any of the four pixels around a sample
@@ -123,10 +223,9 @@ function resampleToLngLat(src, maxCells = MAX_DEM_CELLS) {
     throw new Error('This GeoTIFF does not describe an area on the ground.');
   }
 
-  // Native cell size, taken from the source's own resolution.
-  const nativeM = src.proj.degrees
-    ? Math.min(Math.abs(src.resX) * mPerDegLng(midLat), Math.abs(src.resY) * mPerDegLat(midLat))
-    : Math.min(Math.abs(src.resX), Math.abs(src.resY));
+  // What a pixel of this window is worth on the ground, measured rather than
+  // taken from the header (see nativeGroundM).
+  const nativeM = nativeGroundM(src);
 
   // Keep the source's own resolution unless that would blow the cell budget,
   // then coarsen just enough to fit. One cell size for both axes, so the cells
@@ -220,7 +319,7 @@ export function slopeGrid({ cols, rows, elev, cellXM, cellYM }) {
       const deg = Math.atan(Math.hypot(dzdx, dzdy)) / D2R;
 
       // Round up, not to nearest. A quarter of a degree either way is nothing
-      // to look at, but this figure decides whether a tripod goes somewhere, so
+      // to look at, but this figure decides whether a mast goes somewhere, so
       // the stored value should never read flatter than the ground is.
       const step = Math.ceil(Math.min(deg, SLOPE_MAX_DEG) / SLOPE_STEP_DEG);
       slope[r * cols + c] = Math.min(step, SLOPE_NO_DATA - 1);
@@ -268,8 +367,32 @@ export function slopeBytes(dem) {
  * grid is one byte per cell so a 1.5 km course costs a few hundred kilobytes
  * rather than the tens of megabytes the source file weighs.
  */
-export async function buildDem(arrayBuffer, { fileName = '', maxCells = MAX_DEM_CELLS } = {}) {
-  const src = await readGeoTiff(arrayBuffer);
+export async function buildDem(
+  arrayBuffer,
+  { fileName = '', maxCells = MAX_DEM_CELLS, centre = null, radiusM = DEM_RADIUS_M } = {}
+) {
+  const file = await readGeoTiff(arrayBuffer);
+  const fileBox = lngLatBounds(file);
+
+  /**
+   * Crop to the ground around the course before doing anything else.
+   *
+   * A national survey tile is 10 km across and a golf course is 1.5 km of it.
+   * Spending the cell budget on the whole tile would shade the course at 20 m
+   * and answer nothing; spending it on the course gives metre-scale cells and
+   * a far smaller record. With no centre to work from — which is only the test
+   * suites — the whole file is used.
+   */
+  const box = centre ? clipBox(fileBox, centre, radiusM) : fileBox;
+  if (!box) {
+    const km = (distanceToCoverageM({ ...fileBox }, centre) / 1000).toFixed(1);
+    throw new Error(
+      `This file covers ground about ${km} km from the course, so there is nothing here to shade. `
+      + 'It is probably the wrong tile.'
+    );
+  }
+
+  const src = await readWindow(file, box);
   const grid = resampleToLngLat(src, maxCells);
   const slope = slopeGrid(grid);
 
@@ -294,7 +417,8 @@ export async function buildDem(arrayBuffer, { fileName = '', maxCells = MAX_DEM_
     sourceM: Math.round(grid.nativeM * 100) / 100,
     sourceEpsg: src.epsg,
     sourceCrs: src.proj.name,
-    sourcePixels: src.width * src.height,
+    sourcePixels: file.width * file.height,
+    windowPixels: src.width * src.height,
     coverage: Math.round(grid.coverage * 1000) / 1000,
     elevMin: n ? Math.round(min * 10) / 10 : null,
     elevMax: n ? Math.round(max * 10) / 10 : null,
@@ -330,7 +454,7 @@ export function slopeAt(dem, lngLat) {
   return v * SLOPE_STEP_DEG;
 }
 
-/** How much of the covered ground a tripod could be levelled on. */
+/** How much of the covered ground a mast could be levelled on. */
 export function suitability(dem, limitDeg) {
   const bytes = slopeBytes(dem);
   if (!bytes) return null;

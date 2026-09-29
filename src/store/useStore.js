@@ -3,7 +3,7 @@
  *
  * Three groups: what you have open (course/plan), what is on the plan
  * (entities), and what the toolbar is doing right now (tool/draft/selection).
- * Anything that should survive a refresh goes through lib/storage.js.
+ * Anything that should survive a refresh goes through lib/db/.
  */
 import { create } from 'zustand';
 import * as db from '../lib/db/index.js';
@@ -295,7 +295,7 @@ export const useStore = create((set, get) => ({
       id, kind: 'camera', coords, hole, position,
       // Skips anything already used here and anything broken or missing in the kit.
       number: nextCameraNumber(entities, hole, kit),
-      camType: 'tripod', notes: '',
+      camType: 'mast', notes: '',
     };
     update((list) => [...list, { ...camera, label: cameraLabel(camera) }]);
     set({ selectedId: id, notice: null });

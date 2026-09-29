@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import * as db from '../lib/db/index.js';
+import { migratePlan } from '../lib/migrate.js';
+import CourseElevation from './CourseElevation.jsx';
 import { buildTotals } from '../lib/exportPlan.js';
 import { useStore } from '../store/useStore.js';
 import { formatNumberList } from '../lib/kits.js';
@@ -53,11 +55,14 @@ export default function PlanPicker({ course, onOpen, onBack }) {
     setToast('Plan file downloaded. Whoever you send it to imports it from this screen.');
   };
 
+  const [elevationOpen, setElevationOpen] = useState(false);
+
   const importPlan = async (file) => {
     try {
       const data = JSON.parse(await file.text());
       if (!data.plan) throw new Error('That file has no plan in it');
-      await db.savePlan({ ...data.plan, id: db.newId(), courseId: course.id });
+      // A shared file may have been exported before a rename.
+      await db.savePlan(migratePlan({ ...data.plan, id: db.newId(), courseId: course.id }));
       refresh();
       setToast(`Imported “${data.plan.name}”`);
     } catch (err) {
@@ -131,6 +136,8 @@ export default function PlanPicker({ course, onOpen, onBack }) {
                   </small>
                 </div>
                 <button className="btn" onClick={() => onOpen(p)}>Open</button>
+                <button className="btn ghost" title="Ground elevation for slope shading"
+                        onClick={() => setElevationOpen(true)}>Elevation</button>
                 <button className="btn ghost" title="Duplicate"
                         onClick={async () => { await db.duplicatePlan(p, user || p.owner); refresh(); }}>Copy</button>
                 <button className="btn ghost" title="Share as a file" onClick={() => share(p)}>Share</button>
@@ -148,6 +155,8 @@ export default function PlanPicker({ course, onOpen, onBack }) {
                  onChange={(e) => e.target.files?.[0] && importPlan(e.target.files[0])} />
         </div>
       </div>
+
+      {elevationOpen && <CourseElevation course={course} onClose={() => setElevationOpen(false)} />}
     </div>
   );
 }

@@ -150,8 +150,8 @@ ok(p.entities[0].number === 1 && p.entities[1].number === 3,
 ok(p.entities[0].position === 1 && p.entities[1].position === 2,
    'positions count up within the hole', `g0${p.entities[0].position}, g0${p.entities[1].position}`);
 ok(p.entities[0].label === 'h01-g01', 'a camera is named by its position', p.entities[0].label);
-ok(!('isTripod' in p.entities[0]), 'the tripod boolean is gone');
-ok(p.entities[0].camType === 'tripod', 'camera defaults to the tripod type');
+ok(!('isMast' in p.entities[0]), 'the mast boolean is gone');
+ok(p.entities[0].camType === 'mast', 'camera defaults to the mast type');
 
 const dimmedAfter = await page.$$eval('.hole-btn[data-empty="yes"]', (e) => e.length);
 ok(dimmedAfter === 17, 'the worked hole is no longer dimmed', `${dimmedAfter} still dimmed`);
@@ -160,7 +160,7 @@ const feats = await src('items');
 const colours = await page.evaluate(() =>
   window.__map.getLayer('item-dot').paint['circle-color']);
 ok(typeof colours === 'string', 'cameras are a single colour regardless of type', colours);
-ok(feats.every((f) => f.properties.badge === 'T'), 'tripod cameras carry a T badge');
+ok(feats.every((f) => f.properties.badge === 'M'), 'mast cameras carry an M badge');
 
 await clearTool();
 await page.evaluate(() => {
@@ -168,7 +168,7 @@ await page.evaluate(() => {
   m.fire('click', m.project(f.geometry.coordinates));
 });
 await page.waitForSelector('#cam-type');
-ok(await page.locator('.check input[type=checkbox]').count() === 0, 'no tripod checkbox in the panel');
+ok(await page.locator('.check input[type=checkbox]').count() === 0, 'no mast checkbox in the panel');
 await page.selectOption('#cam-type', 'tower');
 await plan();
 ok((await src('items'))[0].properties.badge === '▲', 'tower cameras carry a ▲ badge');
@@ -494,15 +494,15 @@ const gridCsv = await (await planDl).createReadStream().then(async (st) => {
 });
 fs.writeFileSync('tests/camera-plan.csv', gridCsv);
 const gridLines = gridCsv.split('\n');
-ok(gridLines.some((l) => l === 'Hole,g01,g02,g03,Tripods'), 'the camera plan is a hole x position grid',
+ok(gridLines.some((l) => l === 'Hole,g01,g02,g03,Masts'), 'the camera plan is a hole x position grid',
    gridLines.find((l) => l.startsWith('Hole,')) || '');
 ok(gridLines.filter((l) => /^\d+,/.test(l)).length === 18, 'every hole gets a row, filled or not');
 const row1 = gridLines.find((l) => l.startsWith('1,'));
-ok(/^1,"\d+ [TLH^]","\d+ [TLH^]","\d+ [TLH^]",\d+$/.test(row1),
+ok(/^1,"\d+ [MLH^]","\d+ [MLH^]","\d+ [MLH^]",\d+$/.test(row1),
    'each cell carries the camera number and its mounting mark', row1);
 const row5 = gridLines.find((l) => l.startsWith('5,'));
 ok(row5 === '5,"","","",0', 'holes with nothing planned stay blank', row5);
-ok(/Mounting,T tripod,L LED board,\^ tower,H hospitality/.test(gridCsv), 'the sheet carries a key');
+ok(/Mounting,M mast,L LED board,\^ tower,H hospitality/.test(gridCsv), 'the sheet carries a key');
 
 await page.click('.top-right button:has-text("Menu")');
 const dl = page.waitForEvent('download');
@@ -510,12 +510,12 @@ await page.click('button:has-text("Export rigging breakdown")');
 const csv = await (await dl).createReadStream().then(async (s) => {
   let out = ''; for await (const c of s) out += c; return out;
 });
-ok(/Positions,Camera numbers,Cameras,Tripods/.test(csv), 'CSV has the rigging columns');
+ok(/Positions,Camera numbers,Cameras,Masts/.test(csv), 'CSV has the rigging columns');
 ok(/Hole,Positions,Camera numbers/.test(csv), 'CSV carries positions and camera numbers separately');
 ok(/^Kit,/m.test(csv), 'the CSV names the kit it was built against',
    csv.split('\n').find((l) => l.startsWith('Kit,')) || '');
 ok(/^Cameras out of service,"2 4 5"/m.test(csv), 'and lists what was out of service');
-ok(/^1,"h01-g01 h01-g02 h01-g03","1 3 6",3,2,/m.test(csv), 'tripod count now comes from the camera type',
+ok(/^1,"h01-g01 h01-g02 h01-g03","1 3 6",3,2,/m.test(csv), 'mast count now comes from the camera type',
    csv.split('\n').find((l) => l.startsWith('1,')) || '');
 fs.writeFileSync('tests/breakdown.csv', csv);
 
