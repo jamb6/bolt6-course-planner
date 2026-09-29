@@ -78,6 +78,28 @@ create index if not exists plan_entity_plan_idx on plan_entity (plan_id);
 create index if not exists plan_entity_kind_idx on plan_entity (plan_id, kind);
 create index if not exists plan_entity_hole_idx on plan_entity (plan_id, hole, position);
 
+-- ------------------------------------------------------------- elevation --
+-- One slope grid per course, kept out of the course row on purpose: it is a
+-- few hundred kilobytes, and course rows are read on every sign-in while this
+-- is read only when somebody opens the map with shading on.
+--
+-- The grid itself is a base64 byte per cell inside the document. Postgres would
+-- happily take it as bytea, but jsonb keeps the whole record — bounds, cell
+-- size, source projection, coverage — in one place the app reads and writes
+-- whole, and means adding a field later needs no migration.
+create table if not exists course_dem (
+  course_id  uuid primary key references course(id) on delete cascade,
+  dem        jsonb not null,
+  updated_at timestamptz not null default now(),
+  updated_by uuid references auth.users,
+
+  -- Pulled out so "which courses have elevation, and how good is it" is a
+  -- query rather than a download of every grid.
+  cell_m     double precision generated always as ((dem->>'cellM')::double precision) stored,
+  coverage   double precision generated always as ((dem->>'coverage')::double precision) stored,
+  file_name  text             generated always as (dem->>'fileName') stored
+);
+
 -- --------------------------------------------------------- touch on write --
 create or replace function touch_row() returns trigger language plpgsql as $$
 begin
@@ -89,7 +111,7 @@ end $$;
 do $$
 declare t text;
 begin
-  foreach t in array array['kit','course','plan','plan_entity'] loop
+  foreach t in array array['kit','course','plan','plan_entity','course_dem'] loop
     execute format('drop trigger if exists %I_touch on %I', t, t);
     execute format(
       'create trigger %I_touch before insert or update on %I
@@ -103,11 +125,12 @@ alter table kit         enable row level security;
 alter table course      enable row level security;
 alter table plan        enable row level security;
 alter table plan_entity enable row level security;
+alter table course_dem  enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['kit','course','plan','plan_entity'] loop
+  foreach t in array array['kit','course','plan','plan_entity','course_dem'] loop
     execute format('drop policy if exists %I_team on %I', t, t);
     execute format(
       'create policy %I_team on %I for all

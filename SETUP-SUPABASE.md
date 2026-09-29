@@ -18,13 +18,20 @@ this, but you will eventually.
 
 Open **SQL Editor**, paste all of `supabase/schema.sql`, run it.
 
-It creates four tables (`kit`, `course`, `plan`, `plan_entity`), the indexes,
-an `updated_at`/`updated_by` trigger on each, row-level security, and one
-starter kit. It is safe to run again — every statement is create-if-not-exists
-or drop-then-create, and re-running it will not touch your data.
+It creates five tables (`kit`, `course`, `plan`, `plan_entity`, `course_dem`),
+the indexes, an `updated_at`/`updated_by` trigger on each, row-level security,
+and one starter kit. It is safe to run again — every statement is
+create-if-not-exists or drop-then-create, and re-running it will not touch your
+data.
+
+**Already set up before ground slope existed?** Run the same file again. It adds
+`course_dem` and leaves everything else alone. Until you do, uploading an
+elevation file will fail with a missing-table error; nothing else is affected.
 
 I ran this against a real Postgres 16 before shipping it, twice, and exercised
-it with rows. It is not theoretical SQL.
+it with rows — including a real 500x500 slope grid, to confirm the generated
+columns populate and that deleting a course takes its elevation with it. It is
+not theoretical SQL.
 
 ## 3. Wire up the app
 

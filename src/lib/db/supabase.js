@@ -165,6 +165,44 @@ export async function deleteEntity(planId, entityId) {
   fail((await sb.from('plan_entity').delete().eq('id', entityId)).error);
 }
 
+/* ------------------------------------------------------------ elevation -- */
+/* Its own table, and deliberately not part of load(): a slope grid is a few
+   hundred kilobytes, so pulling every course's on sign-in would make the app
+   feel slow for the sake of data almost nobody needs that session. */
+/**
+ * A workspace set up before ground slope existed has no `course_dem` table, and
+ * PostgREST reports that as a bare 42P01. Say what to do about it instead.
+ */
+const demError = (error) => {
+  if (!error) return null;
+  if (error.code === '42P01' || /course_dem/.test(error.message ?? '')) {
+    return new Error(
+      'This workspace has no elevation table yet. Run supabase/schema.sql again in the '
+      + 'Supabase SQL editor — it adds the one missing table and leaves everything else alone.'
+    );
+  }
+  return error;
+};
+
+export async function loadDem(courseId) {
+  const sb = await getClient();
+  const { data, error } = await sb.from('course_dem')
+    .select('dem').eq('course_id', courseId).maybeSingle();
+  if (error) throw demError(error);
+  return data?.dem ?? null;
+}
+
+export async function saveDem(courseId, dem) {
+  const sb = await getClient();
+  const { error } = await sb.from('course_dem').upsert({ course_id: courseId, dem });
+  if (error) throw demError(error);
+}
+
+export async function deleteDem(courseId) {
+  const sb = await getClient();
+  fail((await sb.from('course_dem').delete().eq('course_id', courseId)).error);
+}
+
 /** Used once, to push a browser's existing work into the shared workspace. */
 export async function importAll({ courses, kits, plans }) {
   const sb = await getClient();

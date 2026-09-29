@@ -50,6 +50,16 @@ ok(!fs.existsSync(path.join(DIST, '_redirects')),
 const chunks = fs.readdirSync(path.join(DIST, 'assets'));
 const total = chunks.reduce((n, f) => n + fs.statSync(path.join(DIST, 'assets', f)).size, 0);
 ok(chunks.some((f) => f.endsWith('.js')), 'assets are fingerprinted for immutable caching', chunks.join(' '));
+
+// The GeoTIFF reader and its codecs are only wanted by whoever uploads an
+// elevation file, which is rare and never on the critical path. They have to
+// stay out of the first load.
+ok(chunks.some((f) => /^geotiff-/.test(f)),
+   'the GeoTIFF reader is split into its own chunk, not shipped on first load');
+ok(!chunks.filter((f) => /^index-.*\.js$/.test(f))
+     .some((f) => fs.readFileSync(path.join(DIST, 'assets', f), 'utf8').includes('GeoTIFFImage')),
+   'and its code is genuinely absent from the entry bundles');
+
 console.log(`  note  bundle ${(total/1024/1024).toFixed(2)} MB total, ${chunks.length} files`);
 
 await b.close(); srv.close();

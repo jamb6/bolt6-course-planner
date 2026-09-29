@@ -41,3 +41,28 @@ export async function deletePlan(id, all) { await putPlans(all); }
    Supabase, where it is what stops two people overwriting each other. */
 export async function saveEntity(planId, entity, all) { await putPlans(all); }
 export async function deleteEntity(planId, entityId, all) { await putPlans(all); }
+
+/* ------------------------------------------------------------ elevation -- */
+/* One key per course rather than one blob for all of them: a slope grid is a
+   few hundred kilobytes and localStorage gives a page about five megabytes in
+   total, so keeping them apart means a second course's DEM cannot take the
+   first one down with it when the quota runs out. */
+const demKey = (courseId) => `b6.dem.${courseId}`;
+
+export async function loadDem(courseId) { return read(demKey(courseId), null); }
+
+export async function saveDem(courseId, dem) {
+  try {
+    localStorage.setItem(demKey(courseId), JSON.stringify(dem));
+  } catch {
+    throw new Error(
+      'This browser is out of storage for elevation data. Remove the elevation from '
+      + 'a course you are not working on, or set up the shared database so it is '
+      + 'stored once for everybody.'
+    );
+  }
+}
+
+export async function deleteDem(courseId) {
+  try { localStorage.removeItem(demKey(courseId)); } catch {}
+}

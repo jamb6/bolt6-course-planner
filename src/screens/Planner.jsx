@@ -6,6 +6,7 @@ import LayoutBar from '../components/LayoutBar.jsx';
 import EntityPanel from '../components/EntityPanel.jsx';
 import MenuSheet from '../components/MenuSheet.jsx';
 import StatsBar from '../components/StatsBar.jsx';
+import SlopeBar from '../components/SlopeBar.jsx';
 import { useStore } from '../store/useStore.js';
 
 /** The map screen. Composes the overlays; the map itself lives in MapView. */
@@ -65,6 +66,7 @@ export default function Planner({ onExit }) {
       <MenuSheet open={menuOpen} onClose={() => setMenuOpen(false)} onExit={onExit} onToast={say} />
 
       <div className="overlay bottom">
+        <SlopeBar />
         {layout ? <LayoutBar /> : <BuildToolbar />}
         <HoleSelector />
       </div>

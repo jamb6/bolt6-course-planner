@@ -7,8 +7,21 @@ class LngLat {
 }
 
 class Source {
-  constructor() { this.data = { type: 'FeatureCollection', features: [] }; }
+  constructor(opts = {}) {
+    this.opts = opts;
+    this.type = opts.type || 'geojson';
+    this.data = { type: 'FeatureCollection', features: [] };
+    // Image sources carry a url and four corners instead of features.
+    this.url = opts.url ?? null;
+    this.coordinates = opts.coordinates ?? null;
+    this.updates = 0;
+  }
   setData(d) { this.data = d; }
+  updateImage({ url, coordinates }) {
+    if (url != null) this.url = url;
+    if (coordinates != null) this.coordinates = coordinates;
+    this.updates++;
+  }
 }
 
 class Map {
@@ -41,13 +54,16 @@ class Map {
   }
   emit(type, ev, layer) { for (const f of [...(this.handlers[this.key(type, layer || null)] || [])]) f(ev); }
 
-  addSource(id) { this.sources[id] = new Source(); }
+  addSource(id, opts) { this.sources[id] = new Source(opts); }
+  removeSource(id) { delete this.sources[id]; }
   addImage(id, img, opts) { (this.images ||= {})[id] = { img, opts }; }
   hasImage(id) { return !!(this.images && this.images[id]); }
   listImages() { return Object.keys(this.images || {}); }
   getSource(id) { return this.sources[id]; }
-  addLayer(l) { this.layers[l.id] = l; }
+  addLayer(l, before) { this.layers[l.id] = { ...l, before: before ?? null }; }
   getLayer(id) { return this.layers[id]; }
+  removeLayer(id) { delete this.layers[id]; }
+  getStyle() { return { layers: Object.values(this.layers), sources: this.sources }; }
   setLayoutProperty() {} setPaintProperty() {} setTerrain() {} setFog() {}
   getCanvas() { return this.canvas; }
   getCanvasContainer() { return this.container; }

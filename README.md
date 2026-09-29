@@ -289,6 +289,21 @@ figure against GeographicLib, the reference implementation, and they agree to
 2 micrometres. PostGIS `ST_Length(geography)` is ellipsoidal too, so when there
 is a backend the two ends will agree.
 
+## Ground slope
+
+Upload a GeoTIFF per course and the map shades the ground by how steep it is,
+so you can see where a tripod will level before anyone walks the course. Click
+a tripod position and the panel gives the slope under it against your limit —
+5 degrees by default, adjustable per device.
+
+The rule the whole feature is built on: **ground is never shown as flat unless
+it was measured as flat.** No file means no shading; a gap in a file stays a
+gap; a camera outside the covered area is told so. A smooth, confident, wrong
+surface would be worse than nothing.
+
+Full guide, including where to get a file for each venue and why the app cannot
+just call an elevation API: **[ELEVATION.md](ELEVATION.md)**.
+
 ## Tests
 
 ```bash
@@ -297,6 +312,7 @@ node tests/e2e.mjs          # the app
 node tests/osm.mjs          # OpenStreetMap failure paths
 node tests/layout.mjs       # drawing a hole layout by hand
 node tests/writes.mjs       # that saves are per entity, not whole-plan
+node tests/slope.mjs        # projections, slope maths, and the overlay
 
 npm run build && node tests/prodcheck.mjs   # the bundle that actually ships
 ```
@@ -311,10 +327,20 @@ extending a run from the (+), inserting a joint by clicking the line, pinned
 points following a moved node, marker icons, hover notes, Move, WASD, CSV
 export and persistence across a reload.
 
-Three more suites cover what is hard to reproduce by hand: `osm.mjs` for
+Four more suites cover what is hard to reproduce by hand: `osm.mjs` for
 OpenStreetMap rate-limiting, hanging and cancellation; `layout.mjs` for
-building a hole layout from nothing; and `writes.mjs` for the write batching
-that keeps two people from overwriting each other. 122 assertions in total.
+building a hole layout from nothing; `writes.mjs` for the write batching that
+keeps two people from overwriting each other; and `slope.mjs` for the elevation
+pipeline. 216 assertions in total.
+
+`slope.mjs` is checked against outside references rather than against itself:
+the projections against **pyproj**, the slope computation against an
+independent **numpy** implementation of the same Horn method, both run over real
+GeoTIFFs in `tests/fixtures/`. It also drives the whole feature in a browser —
+upload a file, shade the map, read a camera's slope, remove the file and watch
+the shading go. That matters because the failure mode here is silent: shading
+that looks plausible and is in the wrong place would send somebody to a bank
+with a tripod.
 
 `vite.config.test.js` swaps `mapbox-gl` for `tests/mapbox-mock.js`, so the
 suites run the real application code without a token or a network. The

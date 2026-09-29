@@ -127,7 +127,55 @@ export const useStore = create((set, get) => ({
       saved: false, planDirty: true,
     })),
 
-  closePlan: () => set({ course: null, plan: null, selectedId: null, tool: null, draft: null }),
+  closePlan: () => set({ course: null, plan: null, selectedId: null, tool: null, draft: null,
+                         dem: null, demState: 'idle' }),
+
+  /* ------------------------------------------------------- ground slope -- */
+  /**
+   * The course's slope grid, and whether it is shaded on the map.
+   *
+   * `dem` null with `demState` 'none' means this course has no elevation — a
+   * real answer, and a different thing from not having looked yet. Nothing in
+   * the app may treat either as flat ground.
+   */
+  dem: null,
+  demState: 'idle',        // 'idle' | 'loading' | 'ready' | 'none' | 'error'
+  demError: null,
+  slopeOn: false,
+  slopeLimit: db.getSlopeLimit(),
+
+  /** Fetches the grid for whatever course is open. Safe to call repeatedly. */
+  loadDem: async (courseId) => {
+    const id = courseId ?? get().course?.id;
+    if (!id) return null;
+    if (db.hasDemLoaded(id)) {
+      const cached = db.peekDem(id);
+      set({ dem: cached, demState: cached ? 'ready' : 'none', demError: null });
+      return cached;
+    }
+    set({ demState: 'loading', demError: null });
+    try {
+      const dem = await db.loadDem(id);
+      // Guard against a slow fetch landing after the user moved on.
+      if (get().course?.id !== id && courseId == null) return dem;
+      set({ dem, demState: dem ? 'ready' : 'none', demError: null });
+      return dem;
+    } catch (err) {
+      set({ dem: null, demState: 'error', demError: err.message });
+      return null;
+    }
+  },
+
+  setDem: (dem) => set({ dem, demState: dem ? 'ready' : 'none', demError: null }),
+
+  /** Shading is pointless without a grid, so asking for it fetches one. */
+  toggleSlope: async () => {
+    const next = !get().slopeOn;
+    set({ slopeOn: next });
+    if (next && get().demState === 'idle') await get().loadDem();
+  },
+
+  setSlopeLimit: (deg) => { db.setSlopeLimit(deg); set({ slopeLimit: db.getSlopeLimit() }); },
 
   /**
    * Writes what changed, one entity at a time. Two people on the same plan

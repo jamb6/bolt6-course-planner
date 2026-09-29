@@ -3,6 +3,8 @@ import { CAMERA_TYPES, CABLE_TYPES, MARKER_TYPES, POSITIONS_PER_HOLE, HOLES_PER_
 import { duplicateNumbers, duplicatePositions, positionId, takenPositions } from '../lib/cameraNumber.js';
 import { isAvailable, formatNumberList } from '../lib/kits.js';
 import { fmtM } from '../lib/geo.js';
+import { slopeAt, coversPoint } from '../lib/dem.js';
+import { slopeBand } from '../map/slopeLayer.js';
 
 /**
  * Right-hand panel. Opens when you click something on the map; the fields
@@ -19,6 +21,9 @@ export default function EntityPanel({ onMove }) {
   const editingCableId = useStore((s) => s.editingCableId);
   const editCablePoints = useStore((s) => s.editCablePoints);
   const stopEditingCable = useStore((s) => s.stopEditingCable);
+  const dem = useStore((s) => s.dem);
+  const demState = useStore((s) => s.demState);
+  const slopeLimit = useStore((s) => s.slopeLimit);
 
   if (!entity) return null;
 
@@ -118,6 +123,12 @@ export default function EntityPanel({ onMove }) {
               </select>
             </div>
 
+            {/* Ground slope only decides anything for a tripod. A tower, an LED
+                board or a hospitality position carries its own levelling. */}
+            {entity.camType === 'tripod' && (
+              <GroundSlope dem={dem} demState={demState} limit={slopeLimit} coords={entity.coords} />
+            )}
+
           </>
         )}
 
@@ -194,5 +205,61 @@ export default function EntityPanel({ onMove }) {
         )}
       </div>
     </aside>
+  );
+}
+
+/**
+ * What the ground is doing under one tripod.
+ *
+ * Four outcomes, and the two "no reading" ones are the point of the thing: a
+ * camera outside the uploaded file's area, or over a gap in it, gets told so
+ * rather than being quietly treated as standing on the flat.
+ */
+function GroundSlope({ dem, demState, limit, coords }) {
+  if (demState === 'loading') return <div className="banner">Checking the ground…</div>;
+
+  if (!dem) {
+    return (
+      <div className="banner">
+        No elevation for this course, so nothing is known about the ground here.
+        Upload a GeoTIFF from the course list to shade it.
+      </div>
+    );
+  }
+
+  if (!coversPoint(dem, coords)) {
+    return (
+      <div className="banner warn">
+        This position is outside the area the elevation file covers — the ground here
+        has not been measured.
+      </div>
+    );
+  }
+
+  const deg = slopeAt(dem, coords);
+  if (deg == null) {
+    return (
+      <div className="banner warn">
+        The elevation file has no reading at this spot, so the slope is unknown. Water and
+        dense tree cover often drop out of a LiDAR ground model.
+      </div>
+    );
+  }
+
+  const band = slopeBand(deg, limit);
+  const cls = band === 'steep' ? 'banner bad' : band === 'near' ? 'banner warn' : 'banner';
+  return (
+    <div className={cls}>
+      <b className="num" style={{ fontSize: 18, color: 'inherit' }}>{deg.toFixed(1)}°</b>{' '}
+      ground slope, against a {limit}° limit.
+      <div style={{ marginTop: 4 }}>
+        {band === 'steep'
+          ? 'Too steep for a tripod here — move it or change the mounting.'
+          : band === 'near'
+            ? 'Close to the limit. Worth a look on the ground before you commit to it.'
+            : 'A tripod will level here.'}
+        {' '}Measured over {dem.cellM} m cells.
+      </div>
+    </div>
   );
 }

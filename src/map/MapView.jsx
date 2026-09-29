@@ -6,6 +6,7 @@ import { MAP_STYLE } from '../data/constants.js';
 import { SOURCES, addLayers, holesGeoJSON, cablesGeoJSON, draftGeoJSON, itemsGeoJSON, verticesGeoJSON } from './layers.js';
 import { addIcons } from './icons.js';
 import { MARKER_TYPES, SWITCH_COLOUR } from '../data/constants.js';
+import { syncSlopeLayer } from './slopeLayer.js';
 import { useMapInteractions } from './useMapInteractions.js';
 import NoteTooltip from '../components/NoteTooltip.jsx';
 
@@ -28,6 +29,9 @@ export default function MapView({ onReady }) {
   const hole = useStore((s) => s.hole);
   const editingCableId = useStore((s) => s.editingCableId);
   const extending = useStore((s) => s.extending);
+  const dem = useStore((s) => s.dem);
+  const slopeOn = useStore((s) => s.slopeOn);
+  const slopeLimit = useStore((s) => s.slopeLimit);
 
   /* ---- create once ---------------------------------------------------- */
   useEffect(() => {
@@ -94,6 +98,14 @@ export default function MapView({ onReady }) {
     if (!h) return;
     map.current.flyTo({ center: h.green, zoom: 17.2, duration: 500 });
   }, [ready, hole, course]);
+
+  /* ---- ground slope shading ------------------------------------------- */
+  /* Redrawn when the limit moves as well as when the grid changes: the stored
+     grid holds degrees, and the limit is what turns a degree into a colour. */
+  useEffect(() => {
+    if (!ready) return;
+    syncSlopeLayer(map.current, dem, slopeLimit, slopeOn);
+  }, [ready, dem, slopeOn, slopeLimit]);
 
   useMapInteractions(map, ready, setCursor, setHover);
 

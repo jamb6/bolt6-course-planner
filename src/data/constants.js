@@ -62,3 +62,42 @@ export const SNAP_PX = 14;
 export const PAN_STEP_PX = 120;
 
 export const MAP_STYLE = 'mapbox://styles/mapbox/satellite-streets-v12';
+
+/* ------------------------------------------------------- ground slope ----- */
+
+/**
+ * The steepest ground a tripod can still be levelled on. Five degrees is the
+ * working figure; it is a setting rather than a constant because it belongs to
+ * the head and the legs, not to the app — a heavy box on a tall column runs out
+ * of level well before a light one on short legs.
+ */
+export const TRIPOD_MAX_SLOPE_DEG = 5;
+export const TRIPOD_SLOPE_RANGE = [1, 20];
+
+/** Ground within this much of the limit is shown as marginal, not as fine. */
+export const SLOPE_MARGIN_DEG = 1;
+
+/**
+ * Slope is stored as one byte per cell, a quarter of a degree per step. That is
+ * finer than any DEM can justify and keeps a whole course under a megabyte.
+ * 255 means no reading — never zero, which would read as flat ground.
+ */
+export const SLOPE_STEP_DEG = 0.25;
+export const SLOPE_MAX_DEG = 60;
+export const SLOPE_NO_DATA = 255;
+
+/**
+ * Cell budget for a stored slope grid. A course is about 1.5 km across, so
+ * 250k cells lands near 3 m — coarser than a 1 m LiDAR source, but a tripod
+ * stands on about a metre of ground and the shading is there to point at the
+ * flat areas, not to certify a single leg.
+ */
+export const MAX_DEM_CELLS = 250000;
+
+/** Shading colours. Deliberately unlike the cameras and the cables. */
+export const SLOPE_COLOURS = {
+  flat:  [ 62, 190, 120],
+  near:  [235, 180,  40],
+  steep: [225,  60,  60],
+};
+export const SLOPE_OPACITY = 0.45;

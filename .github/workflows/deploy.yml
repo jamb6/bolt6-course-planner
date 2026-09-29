@@ -21,6 +21,7 @@ jobs:
       - run: node tests/osm.mjs
       - run: node tests/layout.mjs
       - run: node tests/writes.mjs
+      - run: node tests/slope.mjs
 
   deploy:
     needs: test

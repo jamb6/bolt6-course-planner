@@ -12,6 +12,7 @@
 import * as local from './local.js';
 import * as supabase from './supabase.js';
 import { LPGA_SCHEDULE, LPGA_SEASON } from '../../data/lpgaCourses.js';
+import { TRIPOD_MAX_SLOPE_DEG, TRIPOD_SLOPE_RANGE } from '../../data/constants.js';
 
 const useRemote = supabase.configured();
 const driver = useRemote ? supabase : local;
@@ -38,6 +39,20 @@ export const setToken = (t) => writeLocal('b6.token', t);
 export const clearToken = () => localStorage.removeItem('b6.token');
 export const getUser = () => readLocal('b6.user', '');
 export const setUser = (n) => writeLocal('b6.user', n);
+
+/**
+ * The tripod slope limit, in degrees. Device-local on purpose: it describes the
+ * heads and legs actually in front of you, so a rigger carrying a heavy box on
+ * a tall column and a planner at a desk can each hold the figure their own kit
+ * manages. Clamped on read, so a hand-edited value cannot produce a plan shaded
+ * against a nonsense limit.
+ */
+export const getSlopeLimit = () => {
+  const v = Number(readLocal('b6.slopeLimit', TRIPOD_MAX_SLOPE_DEG));
+  const [lo, hi] = TRIPOD_SLOPE_RANGE;
+  return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : TRIPOD_MAX_SLOPE_DEG;
+};
+export const setSlopeLimit = (deg) => writeLocal('b6.slopeLimit', deg);
 
 /* ----------------------------------------------------------------- init -- */
 const seedCourses = () =>
@@ -164,6 +179,40 @@ export async function deleteEntity(planId, entityId) {
   const plan = getPlan(planId);
   if (plan) plan.entities = plan.entities.filter((e) => e.id !== entityId);
   await driver.deleteEntity(planId, entityId, cache.plans);
+}
+
+/* ------------------------------------------------------------- elevation -- */
+/**
+ * A course's slope grid, loaded on demand rather than with everything else —
+ * it is a few hundred kilobytes and most sessions never open it.
+ *
+ * Cached per course once fetched. `null` is a real answer, meaning this course
+ * has no elevation, and it is cached too so opening the map does not re-ask on
+ * every hole change.
+ */
+const demCache = new Map();
+
+export async function loadDem(courseId) {
+  if (!courseId) return null;
+  if (demCache.has(courseId)) return demCache.get(courseId);
+  const dem = await driver.loadDem(courseId);
+  demCache.set(courseId, dem ?? null);
+  return dem ?? null;
+}
+
+/** What is already in hand, without going to storage. */
+export const peekDem = (courseId) => demCache.get(courseId) ?? null;
+export const hasDemLoaded = (courseId) => demCache.has(courseId);
+
+export async function saveDem(courseId, dem) {
+  await driver.saveDem(courseId, dem);
+  demCache.set(courseId, dem);
+  return dem;
+}
+
+export async function deleteDem(courseId) {
+  await driver.deleteDem(courseId);
+  demCache.set(courseId, null);
 }
 
 /* ------------------------------------------------------------------ auth -- */

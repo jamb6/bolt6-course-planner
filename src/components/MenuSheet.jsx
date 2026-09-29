@@ -14,6 +14,8 @@ export default function MenuSheet({ open, onClose, onExit, onToast }) {
   const holes = useStore((s) => s.course?.holes ?? []);
   const startLayout = useStore((s) => s.startLayout);
   const setKit = useStore((s) => s.setKit);
+  const dem = useStore((s) => s.dem);
+  const slopeLimit = useStore((s) => s.slopeLimit);
 
   if (!open) return null;
   const kits = db.getKits();
@@ -31,7 +33,7 @@ export default function MenuSheet({ open, onClose, onExit, onToast }) {
 
   const exportCSV = () => {
     download(`${slug(course.name)}-${slug(plan.name)}-rigging.csv`,
-             toCSV(plan, course, plan.entities, kit), 'text/csv');
+             toCSV(plan, course, plan.entities, kit, dem, slopeLimit), 'text/csv');
     onToast('Rigging breakdown downloaded');
     onClose();
   };
@@ -65,7 +67,9 @@ export default function MenuSheet({ open, onClose, onExit, onToast }) {
       </button>
       <hr />
       <button role="menuitem" onClick={exportCameraPlan}>Export camera plan (CSV)</button>
-      <button role="menuitem" onClick={exportCSV}>Export rigging breakdown (CSV)</button>
+      <button role="menuitem" onClick={exportCSV}>
+        Export rigging breakdown (CSV){dem ? ' — with ground slope' : ''}
+      </button>
       <button role="menuitem" onClick={exportPlanFile}>Export plan file (share)</button>
       <hr />
       <button role="menuitem" onClick={async () => { await save(); onExit(); }}>Load a different course or plan</button>

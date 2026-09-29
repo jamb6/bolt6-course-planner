@@ -4,9 +4,11 @@
  * This is the sheet the crew carries: for each hole, which camera numbers are
  * on it, how many tripods to bring, and how much cable of each type.
  */
-import { CABLE_TYPES, CABLE_BUCKETS, CAMERA_TYPES, POSITIONS_PER_HOLE } from '../data/constants.js';
+import { CABLE_TYPES, CABLE_BUCKETS, CAMERA_TYPES, POSITIONS_PER_HOLE,
+         SLOPE_MARGIN_DEG, TRIPOD_MAX_SLOPE_DEG } from '../data/constants.js';
 import { fmtM } from './geo.js';
 import { positionId } from './cameraNumber.js';
+import { slopeAt, coversPoint } from './dem.js';
 
 const bucketFor = (metres) =>
   CABLE_BUCKETS.find((b) => metres >= b.min && metres < b.max) ?? CABLE_BUCKETS[0];
@@ -83,7 +85,7 @@ export function buildTotals(entities) {
   };
 }
 
-export function toCSV(plan, course, entities, kit) {
+export function toCSV(plan, course, entities, kit, dem = null, limitDeg = TRIPOD_MAX_SLOPE_DEG) {
   const rows = buildBreakdown(entities);
   const totals = buildTotals(entities);
   const cableCols = CABLE_TYPES.map((t) => `${t.label} (m)`);
@@ -124,7 +126,65 @@ export function toCSV(plan, course, entities, kit) {
       JSON.stringify(`${fmtM(totals.totalCableM)} m of cable total`)].join(',')
   );
 
+  const slope = buildSlopeRows(entities, dem, limitDeg);
+  if (slope) {
+    lines.push('');
+    lines.push(['GROUND SLOPE',
+      JSON.stringify(`tripod limit ${slope.limitDeg} deg`),
+      JSON.stringify(`${slope.dem.fileName || 'uploaded elevation'}, ${slope.dem.cellM} m cells`)].join(','));
+    lines.push(['Position', 'Camera', 'Slope (deg)', 'Verdict'].join(','));
+    for (const f of slope.flagged) {
+      lines.push([
+        JSON.stringify(positionId(f.entity.hole, f.entity.position) ?? f.entity.label ?? ''),
+        f.entity.number ?? '',
+        f.deg == null ? '' : f.deg.toFixed(1),
+        JSON.stringify(f.verdict),
+      ].join(','));
+    }
+    lines.push(['', '', '',
+      JSON.stringify(`${slope.fine} tripod position(s) comfortably inside the limit`)].join(','));
+  } else {
+    // Said out loud, because a missing section reads as "all clear".
+    lines.push('');
+    lines.push('GROUND SLOPE,"not checked - no elevation uploaded for this course"');
+  }
+
   return lines.join('\n');
+}
+
+/**
+ * The tripod slope section of the rigging breakdown.
+ *
+ * Only the positions that need a decision are listed: too steep, close to the
+ * limit, or unmeasured. Everything that is comfortably fine is a count, because
+ * a sheet that lists all sixty makes the four that matter harder to find.
+ *
+ * With no elevation loaded this returns nothing at all rather than a column of
+ * blanks, which would read as though every position had been checked and passed.
+ */
+export function buildSlopeRows(entities, dem, limitDeg) {
+  if (!dem) return null;
+  const flagged = [];
+  let fine = 0;
+
+  for (const e of entities) {
+    if (e.kind !== 'camera' || e.camType !== 'tripod') continue;
+    const outside = !coversPoint(dem, e.coords);
+    const deg = outside ? null : slopeAt(dem, e.coords);
+
+    if (deg == null) {
+      flagged.push({ entity: e, deg: null, verdict: outside ? 'Outside the elevation file' : 'No reading' });
+    } else if (deg > limitDeg) {
+      flagged.push({ entity: e, deg, verdict: 'Too steep' });
+    } else if (deg > limitDeg - SLOPE_MARGIN_DEG) {
+      flagged.push({ entity: e, deg, verdict: 'Close to the limit' });
+    } else {
+      fine += 1;
+    }
+  }
+
+  flagged.sort((a, b) => (b.deg ?? Infinity) - (a.deg ?? Infinity));
+  return { flagged, fine, limitDeg, dem };
 }
 
 /** Trigger a browser download. */

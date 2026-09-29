@@ -76,6 +76,12 @@ button { background: none; border: 0; cursor: pointer; }
   background: var(--panel);
 }
 .item:hover { border-color: var(--dim); }
+/* A row whose main body opens the thing, with a side action alongside. The body
+   keeps its full hit target and the action sits outside it, so a click on one is
+   never accidentally a click on the other. */
+.item-row { display: flex; align-items: stretch; gap: 8px; }
+.item-row > .item { flex: 1; min-width: 0; }
+.item-row > .btn { flex: none; }
 .item .grow { flex: 1; min-width: 0; }
 .item b { display: block; font-weight: 600; }
 .item small { color: var(--muted); font-size: 12px; }
@@ -202,6 +208,30 @@ button { background: none; border: 0; cursor: pointer; }
   .planner.with-panel .top-right { right: 12px; }
   .planner.with-panel .menu { right: 12px; }
   .planner.with-panel .bottom { bottom: calc(52vh + 12px); transform: translateX(-50%); }
-  .hole-bar { overflow-x: auto; scrollbar-width: none; max-width: calc(100vw - 24px); }
+  /* Both bottom bars are wider than a phone, so they scroll sideways. They must
+     also start at the left rather than centred: a centred flex row that
+     overflows puts its first items at a negative offset, which no amount of
+     scrolling can reach — on a 390 px screen that hid the Camera button and
+     holes 1 to 3 completely. */
+  .bottom .bar { justify-content: flex-start; }
+  .hole-bar, .build-bar { overflow-x: auto; scrollbar-width: none; max-width: calc(100vw - 24px); }
+  .hole-bar::-webkit-scrollbar, .build-bar::-webkit-scrollbar { display: none; }
   .stats-course { display: none; }        /* no room beside the title on a phone */
 }
+
+/* ---------------------------------------------------------- slope shading -- */
+/* Sits above the build tools in the bottom stack. Wraps rather than scrolls,
+   so on a phone the key drops to its own line instead of being cut off. */
+.slope-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  align-self: center; max-width: 100%;
+  padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  backdrop-filter: blur(6px);
+  font-size: 11.5px; color: var(--muted);
+}
+.slope-bar .tag.bad { color: var(--bad); border-color: var(--bad); }
+.slope-limit { display: flex; align-items: center; gap: 7px; }
+.slope-limit > span { font-family: var(--mono); color: var(--text); min-width: 34px; }
+.slope-limit input[type="range"] { width: 96px; }
+.slope-key { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
