@@ -64,6 +64,18 @@ for (const [label, viewport] of [
   await page.waitForSelector('.panel');
   await page.waitForTimeout(300);
   await page.screenshot({ path: `tests/shot-slope-${label}.png` });
+
+  // 3D on, to check the top bar still fits and nothing is pushed off screen.
+  await page.click('.top-right button:has-text("3D")');
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: `tests/shot-3d-${label}.png` });
+  const bar = await page.evaluate(() => {
+    const b = document.querySelector('.top-right');
+    const r = b.getBoundingClientRect();
+    return { x: Math.round(r.x), right: Math.round(r.right), vw: window.innerWidth,
+             scrolls: b.scrollWidth > b.clientWidth + 1 };
+  });
+  console.log(`  ${label} top bar`, JSON.stringify(bar));
   await ctx.close();
   console.log('shot', label);
 }

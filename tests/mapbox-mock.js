@@ -31,7 +31,9 @@ class Map {
     this.sources = {};
     this.layers = {};
     this.centre = opts.center;
-    this.calls = { flyTo: [], panBy: [] };
+    this.calls = { flyTo: [], panBy: [], easeTo: [] };
+    this.terrain = null;
+    this.pitch = 0;
     this.canvas = document.createElement('canvas');
     this.container = document.createElement('div');
     this.container.appendChild(this.canvas);
@@ -64,7 +66,12 @@ class Map {
   getLayer(id) { return this.layers[id]; }
   removeLayer(id) { delete this.layers[id]; }
   getStyle() { return { layers: Object.values(this.layers), sources: this.sources }; }
-  setLayoutProperty() {} setPaintProperty() {} setTerrain() {} setFog() {}
+  setLayoutProperty() {} setPaintProperty() {} setFog() {}
+  setTerrain(t) { this.terrain = t ?? null; }
+  getTerrain() { return this.terrain; }
+  getBearing() { return 0; }
+  getPitch() { return this.pitch; }
+  setPitch(p) { this.pitch = p; }
   getCanvas() { return this.canvas; }
   getCanvasContainer() { return this.container; }
   getZoom() { return 17; }
@@ -111,7 +118,7 @@ class Map {
     return out;
   }
   flyTo(o) { this.calls.flyTo.push(o); if (o.center) this.centre = Array.isArray(o.center) ? o.center : [o.center.lng, o.center.lat]; }
-  easeTo(o) { this.flyTo(o); }
+  easeTo(o) { this.calls.easeTo.push(o); this.flyTo(o); if (o && o.pitch != null) this.pitch = o.pitch; }
   panBy(offset) { this.calls.panBy.push(offset); }
   remove() {}
 

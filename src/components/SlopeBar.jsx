@@ -29,6 +29,7 @@ export default function SlopeBar() {
   const setSlopeLimit = useStore((s) => s.setSlopeLimit);
   const loadDem = useStore((s) => s.loadDem);
   const courseId = useStore((s) => s.course?.id);
+  const view3d = useStore((s) => s.view3d);
 
   /* Find out whether this course has elevation without waiting to be asked, so
      the button can say what it will do before it is pressed. */
@@ -65,6 +66,9 @@ export default function SlopeBar() {
             <span style={{ color: 'var(--dim)' }}>unshaded = no reading</span>
           </span>
           {stats && <span className="tag">{Math.round(stats.fraction * 100)}% at {limit}°</span>}
+          {/* The 3D relief is a coarse global DEM and will not show a bank this
+              shading calls too steep. Say which one to believe. */}
+          {view3d && <span className="tag">shading is measured · relief is not</span>}
         </>
       )}
     </div>

@@ -128,7 +128,7 @@ export const useStore = create((set, get) => ({
     })),
 
   closePlan: () => set({ course: null, plan: null, selectedId: null, tool: null, draft: null,
-                         dem: null, demState: 'idle' }),
+                         dem: null, demState: 'idle', view3d: false }),
 
   /* ------------------------------------------------------- ground slope -- */
   /**
@@ -176,6 +176,11 @@ export const useStore = create((set, get) => ({
   },
 
   setSlopeLimit: (deg) => { db.setSlopeLimit(deg); set({ slopeLimit: db.getSlopeLimit() }); },
+
+  /* ------------------------------------------------------------ 3D view -- */
+  /** Tilted terrain view. Visual context only — see map/terrain.js. */
+  view3d: false,
+  toggle3d: () => set((s) => ({ view3d: !s.view3d })),
 
   /**
    * Writes what changed, one entity at a time. Two people on the same plan

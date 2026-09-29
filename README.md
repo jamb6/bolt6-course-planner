@@ -36,6 +36,13 @@ npm install
 npm run dev          # http://localhost:5173
 ```
 
+**Run `npm install` every time you unzip a new version over an old folder.**
+Unzipping replaces `package.json` but never `node_modules`, so a release that
+added a dependency fails at startup with
+`[plugin:vite:import-analysis] Failed to resolve import "..."`. That message
+always means the same thing: `npm install` has not been run since the
+dependency was added. Run it in the folder that contains `package.json`.
+
 You need a Mapbox **public** token (starts with `pk.`). The app asks for one on
 first run and keeps it in `localStorage`. To skip that, copy `.env.example` to
 `.env` and set `VITE_MAPBOX_TOKEN`.
@@ -303,6 +310,23 @@ surface would be worse than nothing.
 
 Full guide, including where to get a file for each venue and why the app cannot
 just call an elevation API: **[ELEVATION.md](ELEVATION.md)**.
+
+## 3D view
+
+The **3D** button in the top bar tilts the map and turns on terrain relief, a
+sky and extruded buildings — useful for seeing what a camera position actually
+looks at, and what it has to see past.
+
+It costs nothing: Mapbox GL JS is billed per map load rather than per tile, so
+the elevation tiles come out of the session you already paid for by opening the
+map. No second API, no second key, no second licence.
+
+**It is for looking at, not for measuring.** The relief comes from Mapbox's
+global elevation tileset, which runs to roughly 5–10 m per pixel and is
+exaggerated on top of that so a gently rolling course reads at all. It will not
+show a bank that the 1 m slope shading calls too steep. Where the two disagree,
+the shading is the measured one — and the planner says so on screen whenever
+both are on.
 
 ## Tests
 

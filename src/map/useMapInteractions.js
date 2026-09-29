@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useStore } from '../store/useStore.js';
-import { SNAP_PX, PAN_STEP_PX } from '../data/constants.js';
+import { SNAP_PX, PAN_STEP_PX, MAX_PLACE_FROM_COURSE_M } from '../data/constants.js';
+import { distance } from '../lib/geo.js';
 
 /**
  * Everything the mouse and keyboard do on the map.
@@ -72,6 +73,17 @@ export function useMapInteractions(mapRef, ready, setCursor, setHover) {
     const onClick = (ev) => {
       const s = store();
       const here = [ev.lngLat.lng, ev.lngLat.lat];
+
+      /* In the tilted 3D view the far half of the screen is a long way off, so
+         a stray click near the top of the viewport unprojects to somewhere
+         kilometres away. Refuse it rather than silently dropping a camera in
+         the next county. Only checked when placing, never when selecting. */
+      const placing = s.layout || s.moveId || s.tool;
+      const centre = s.course?.lngLat;
+      if (placing && centre && distance(centre, here) > MAX_PLACE_FROM_COURSE_M) {
+        s.setNotice('That click landed off the course — tilt back or zoom in and try again.');
+        return;
+      }
 
       // Laying out the course takes priority over everything else.
       if (s.layout) { s.setHolePoint(s.hole ?? 1, s.layout.target, here); return; }

@@ -338,6 +338,79 @@ await page.waitForFunction(() => !/ground slope/i.test(document.querySelector('.
   null, { timeout: 5000 }).then(() => ok(true, 'switching to a tower drops the slope readout — it levels itself'))
   .catch(() => ok(false, 'switching to a tower should drop the slope readout'));
 
+/* ---- 3D view: context only, and it must say so --------------------------- */
+await page.selectOption('#cam-type', 'tripod');
+ok(await page.evaluate(() => window.__map.getTerrain() == null), 'the map starts flat');
+
+await page.click('.top-right button:has-text("3D")');
+await page.waitForFunction(() => window.__map.getTerrain() != null, null, { timeout: 10000 });
+const terrain = await page.evaluate(() => ({
+  t: window.__map.getTerrain(),
+  demType: window.__map.getSource('mapbox-dem')?.opts?.type,
+  sky: !!window.__map.getLayer('sky'),
+  pitch: window.__map.getPitch(),
+}));
+ok(terrain.demType === 'raster-dem', 'terrain comes from a raster-dem source');
+ok(terrain.t.source === 'mapbox-dem', 'and from Mapbox\u2019s own elevation tileset, on the token already in use');
+ok(terrain.t.exaggeration > 1, 'relief is exaggerated so a gently rolling course reads at all',
+  `x${terrain.t.exaggeration}`);
+ok(terrain.sky, 'a sky is added, so the horizon is not grey once the camera tilts');
+ok(terrain.pitch === 60, 'the camera tilts', `pitch ${terrain.pitch}`);
+
+// The two elevation sources can disagree, and the planner has to say which one
+// is the measured one. This is the whole reason the 3D view is safe to ship.
+const bar = await page.locator('.slope-bar').innerText();
+ok(/shading is measured/i.test(bar),
+  'with both on, the bar says the shading is measured and the relief is not', bar.replace(/\n/g, ' | '));
+ok(await page.locator('.toast').innerText().then((t) => /context only/.test(t)).catch(() => false),
+  'and turning 3D on says so once, in plain words');
+
+// A stray click near the horizon must not drop a camera kilometres away. The
+// tilted view makes the far half of the screen a long way off, so this is a
+// real click a real planner can make, not a contrived one.
+{
+  const before = await page.evaluate(() => window.__b6.store.getState().plan.entities.length);
+  // Arm the camera explicitly. Clicking the toolbar button would toggle it,
+  // and it is still armed from the placement further up.
+  await page.evaluate(() => window.__b6.store.getState().setTool('camera'));
+  // Eight kilometres north of the course: roughly where the horizon sits at a
+  // 60 degree pitch, and well past anything that could be part of the venue.
+  await page.evaluate(() => {
+    const c = window.__b6.store.getState().course.lngLat;
+    window.__map.fire('click', { lng: c[0], lat: c[1] + 0.072 });
+  });
+  await page.waitForTimeout(200);
+  ok(await page.evaluate(() => window.__b6.store.getState().plan.entities.length) === before,
+     'a click that lands off the course is refused, not placed miles away');
+  ok(await page.locator('.toast').innerText().then((t) => /off the course/i.test(t)).catch(() => false),
+     'and says why');
+
+  // The same click just inside the limit still places normally, so the guard
+  // is not quietly swallowing ordinary work at the edge of a course.
+  await page.evaluate(() => {
+    const s = window.__b6.store.getState();
+    s.setTool('camera');
+    const c = s.course.lngLat;
+    window.__map.fire('click', { lng: c[0], lat: c[1] + 0.004 });
+  });
+  await page.waitForTimeout(200);
+  ok(await page.evaluate(() => window.__b6.store.getState().plan.entities.length) === before + 1,
+     'a click 440 m out still places, so the guard is not over-eager');
+
+  await page.evaluate(() => {
+    const s = window.__b6.store.getState();
+    s.select(s.plan.entities.find((e) => e.kind === 'camera').id);
+  });
+  await page.waitForSelector('#cam-type');
+}
+
+await page.click('.top-right button:has-text("3D")');
+await page.waitForFunction(() => window.__map.getTerrain() == null, null, { timeout: 10000 });
+ok(!(await page.evaluate(() => !!window.__map.getLayer('sky'))), 'turning 3D off removes the sky');
+ok(await page.evaluate(() => window.__map.getPitch()) === 0, 'and flattens the camera back for planning');
+ok(await page.evaluate(() => !!window.__map.getSource('mapbox-dem')),
+  'the elevation source is kept, so toggling back does not refetch tiles');
+
 // And with the elevation removed, the map must go back to showing nothing.
 await page.selectOption('#cam-type', 'tripod');
 await page.evaluate(async () => {

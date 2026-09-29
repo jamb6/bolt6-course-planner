@@ -7,6 +7,7 @@ import { SOURCES, addLayers, holesGeoJSON, cablesGeoJSON, draftGeoJSON, itemsGeo
 import { addIcons } from './icons.js';
 import { MARKER_TYPES, SWITCH_COLOUR } from '../data/constants.js';
 import { syncSlopeLayer } from './slopeLayer.js';
+import { syncTerrain, setPitch } from './terrain.js';
 import { useMapInteractions } from './useMapInteractions.js';
 import NoteTooltip from '../components/NoteTooltip.jsx';
 
@@ -32,6 +33,7 @@ export default function MapView({ onReady }) {
   const dem = useStore((s) => s.dem);
   const slopeOn = useStore((s) => s.slopeOn);
   const slopeLimit = useStore((s) => s.slopeLimit);
+  const view3d = useStore((s) => s.view3d);
 
   /* ---- create once ---------------------------------------------------- */
   useEffect(() => {
@@ -106,6 +108,15 @@ export default function MapView({ onReady }) {
     if (!ready) return;
     syncSlopeLayer(map.current, dem, slopeLimit, slopeOn);
   }, [ready, dem, slopeOn, slopeLimit]);
+
+  /* ---- 3D view --------------------------------------------------------- */
+  /* Terrain first, then the tilt: pitching before the relief exists shows a
+     flat plane swinging into view, which reads as a glitch. */
+  useEffect(() => {
+    if (!ready) return;
+    syncTerrain(map.current, view3d);
+    setPitch(map.current, view3d);
+  }, [ready, view3d]);
 
   useMapInteractions(map, ready, setCursor, setHover);
 

@@ -102,6 +102,40 @@ find out whether a position is comfortably fine or only just.
 
 ---
 
+## The 3D view is a different thing
+
+The **3D** button tilts the map and adds terrain relief, a sky and extruded
+buildings. It is visual context — what a position looks at, and what it has to
+see past — and it is free, because Mapbox bills per map load rather than per
+tile.
+
+It is not a second opinion on slope. Its heights come from Mapbox's global
+elevation tileset at roughly 5–10 m per pixel, exaggerated 1.5x so a gently
+rolling course reads on a screen at all. A bunker face the shading calls too
+steep will look like nothing in the relief. When both are on, the slope bar
+says `shading is measured · relief is not`.
+
+### Why not Google's Photorealistic 3D Tiles
+
+Rendering them live is permitted; **exporting them into this app is not.**
+Google's Map Tiles API policy says you "must not pre-fetch, index, store, or
+cache any Content," lists "Geodata extraction or resale" and "Offline uses"
+among prohibited uses, and requires that "3D objects aren't extracted, traced,
+or otherwise derived by hand or machine from Photorealistic 3D Tiles."
+
+Even setting the licence aside, they would not help with tripods. They are a
+photogrammetric mesh from aerial imagery — a *surface* model, with trees,
+grandstands and roofs in it as though they were ground — at metre-level vertical
+accuracy, which is noise at the baseline slope is measured over. Google's own
+FAQ calls the data not survey-grade and intended for immersive visualisation
+"rather than support spatial analysis or model measurements."
+
+Cesium World Terrain is free and legitimate, but it is a decimated streaming
+blend of the same open sources listed above (SRTM, EU-DEM, the USGS National
+Elevation Dataset, national LiDAR). Where it is good it is good because USGS or
+the Environment Agency published it — and you can have that source intact, as a
+GeoTIFF, for nothing.
+
 ## What it does to the data
 
 - The file is resampled onto a regular longitude/latitude grid and slope is

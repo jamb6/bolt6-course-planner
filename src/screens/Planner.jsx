@@ -26,6 +26,8 @@ export default function Planner({ onExit }) {
   const notice = useStore((s) => s.notice);
   const layout = useStore((s) => s.layout);
   const holeNow = useStore((s) => s.hole);
+  const view3d = useStore((s) => s.view3d);
+  const toggle3d = useStore((s) => s.toggle3d);
 
   const say = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2600); };
 
@@ -60,6 +62,16 @@ export default function Planner({ onExit }) {
           <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>{course?.name}</div>
         </div>
         <span className="tag">{saved ? 'Saved' : 'Saving…'}</span>
+        <button className="btn ghost" aria-pressed={view3d}
+                title="Tilt into a 3D view of the terrain — for looking at, not for measuring"
+                onClick={() => {
+                  // Said once, on the way in: the relief and the slope shading
+                  // come from different data and can disagree.
+                  if (!view3d) say('3D terrain is Mapbox\u2019s global elevation, for context only \u2014 slope shading is the measured one.');
+                  toggle3d();
+                }}>
+          3D
+        </button>
         <button className="btn ghost" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}>Menu</button>
       </div>
 

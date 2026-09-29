@@ -101,3 +101,25 @@ export const SLOPE_COLOURS = {
   steep: [225,  60,  60],
 };
 export const SLOPE_OPACITY = 0.45;
+
+/* --------------------------------------------------------------- 3D view -- */
+
+/**
+ * Terrain relief is for reading the shape of a course, never for measuring it.
+ * Mapbox's global elevation tileset runs to about 5–10 m per pixel, so it will
+ * not show the bank a 1 m LiDAR file shades red. Where the two disagree, the
+ * slope shading is the one to believe.
+ *
+ * Golf is gentle enough that true scale reads as flat on a screen, so the
+ * relief is exaggerated to make it legible — which is the other reason nothing
+ * in the 3D view is safe to measure against.
+ */
+export const TERRAIN_EXAGGERATION = 1.5;
+export const PITCH_3D = 60;
+
+/**
+ * How far from the course centre a click may place something. Generous enough
+ * for any real course and its car parks, tight enough to catch a click near the
+ * horizon in the tilted view, which can unproject kilometres away.
+ */
+export const MAX_PLACE_FROM_COURSE_M = 5000;
