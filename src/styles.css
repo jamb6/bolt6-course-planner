@@ -100,8 +100,12 @@ button { background: none; border: 0; cursor: pointer; }
   background: color-mix(in srgb, var(--panel) 92%, transparent);
   backdrop-filter: blur(12px); border: 1px solid var(--line); border-radius: var(--radius);
 }
-.top-right { top: 12px; right: 12px; max-width: calc(100vw - 24px); overflow-x: auto; scrollbar-width: none; }
-.top-right::-webkit-scrollbar { display: none; }
+/* A column: the toolbar, and the slope key tucked under it when shading is on.
+   The scroll lives on the bar itself, so the strip below is free to wrap. */
+.top-right { top: 12px; right: 12px; max-width: calc(100vw - 24px);
+             display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.top-right > .bar { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.top-right > .bar::-webkit-scrollbar { display: none; }
 
 /* Bottom of the screen: build tools with the hole row joined underneath.
    Both bars stretch to the same width so the join reads as one block. */
@@ -172,6 +176,12 @@ button { background: none; border: 0; cursor: pointer; }
 .planner.with-panel .menu { right: 332px; }
 .planner.with-panel .bottom { transform: translateX(calc(-50% - 160px)); }
 
+/* Plan name and course, between the view switches and the save state. Fixed
+   width so it truncates rather than pushing the menu off the bar. */
+.plan-title { padding: 0 6px; max-width: 240px; min-width: 0; }
+.plan-title > b { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-title > div { font-size: 10.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .menu { position: absolute; top: 60px; right: 12px; z-index: 12; width: 250px; padding: 6px; }
 .menu button { display: block; width: 100%; text-align: left; padding: 11px 12px; border-radius: 7px; }
 .menu button:hover { background: var(--panel-2); }
@@ -192,10 +202,13 @@ button { background: none; border: 0; cursor: pointer; }
 /* Hints live top-left, which is free now the hole row moved to the bottom.
    Never interactive — at the bottom it was intercepting clicks on the tools. */
 .toast {
-  position: absolute; top: 12px; left: 12px; z-index: 20; pointer-events: none;
+  /* Sits in the top-right column under the toolbar, so it never overlaps the
+     controls or the hole strip. pointer-events stays off — it is a hint, and
+     clicks belong to the map underneath. */
+  pointer-events: none; text-align: right;
   background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
   padding: 9px 14px; font-size: 12.5px; box-shadow: 0 8px 26px rgba(0,0,0,.5);
-  max-width: calc(100vw - 24px);
+  max-width: 100%;
 }
 
 .modal-bg { position: fixed; inset: 0; z-index: 50; background: rgba(4,8,12,.72); display: grid; place-items: center; padding: 20px; }
@@ -217,6 +230,10 @@ button { background: none; border: 0; cursor: pointer; }
   .hole-bar, .build-bar { overflow-x: auto; scrollbar-width: none; max-width: calc(100vw - 24px); }
   .hole-bar::-webkit-scrollbar, .build-bar::-webkit-scrollbar { display: none; }
   .stats-course { display: none; }        /* no room beside the title on a phone */
+  /* Two view switches, the title, the save state and the menu do not fit
+     across a phone, so the title gives up the room rather than the controls. */
+  .plan-title { max-width: 104px; }
+
 
   /* A list row with several actions does not fit across a phone: the label gets
      squeezed to one word per line and the last button falls off the edge. Give
@@ -231,14 +248,22 @@ button { background: none; border: 0; cursor: pointer; }
    so on a phone the key drops to its own line instead of being cut off. */
 .slope-bar {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  align-self: center; max-width: 100%;
+  justify-content: flex-end; max-width: 100%;
   padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius);
   background: color-mix(in srgb, var(--panel) 88%, transparent);
   backdrop-filter: blur(6px);
   font-size: 11.5px; color: var(--muted);
 }
 .slope-bar .tag.bad { color: var(--bad); border-color: var(--bad); }
-.slope-limit { display: flex; align-items: center; gap: 7px; }
-.slope-limit > span { font-family: var(--mono); color: var(--text); min-width: 34px; }
-.slope-limit input[type="range"] { width: 96px; }
+/* Stepper for the mast floor limit. The value box is a fixed width and always
+   carries one decimal, so stepping 3.5 -> 4.0 cannot resize the row and slide
+   the buttons out from under the pointer. */
+.slope-step { display: flex; align-items: center; gap: 2px; }
+.slope-step > .btn { min-height: 26px; padding: 0 9px; font-size: 15px; line-height: 1; }
+.slope-step > .btn:disabled { opacity: .35; }
+.slope-step-value {
+  font-family: var(--mono); color: var(--text); font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  width: 52px; text-align: center;
+}
 .slope-key { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }

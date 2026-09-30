@@ -89,6 +89,7 @@ export default function CourseElevation({ course, onClose }) {
           <div className="banner">
             <b style={{ color: 'var(--text)' }}>{dem.fileName || 'Elevation'}</b> · {dem.cellM} m cells ·{' '}
             {Math.round(dem.coverage * 100)}% covered
+            {dem.effectiveM != null && <> · detail to {dem.effectiveM} m</>}
             {stats && (
               <> · <b style={{ color: 'var(--text)' }}>{Math.round(stats.fraction * 100)}%</b> mast-suitable</>
             )}
@@ -112,6 +113,18 @@ export default function CourseElevation({ course, onClose }) {
           <div className="banner warn">
             The source is {dem.sourceM} m, too coarse to show the undulation a mast sits on. Treat the
             shading as a hint.
+          </div>
+        )}
+
+        {/* A header says what the cell size is, not whether the cells mean
+            anything. This is measured from the data itself — but smooth ground
+            and resampled data look alike, so it reports rather than accuses. */}
+        {dem && dem.effectiveM != null && dem.effectiveM >= dem.cellM * 4 && (
+          <div className="banner warn">
+            The detail in this file only goes down to about {dem.effectiveM} m, even though it is
+            stored at {dem.cellM} m cells. Either it was resampled up from a coarser product, or this
+            ground really is that smooth. Worth checking where it came from before trusting the
+            shading on small features.
           </div>
         )}
 

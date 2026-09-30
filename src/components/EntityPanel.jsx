@@ -70,13 +70,10 @@ export default function EntityPanel({ onMove }) {
                 </select>
               </div>
             </div>
-            <p className="hint">
-              Clockwise from the left of the green. Every camera needs a hole and a position
-              or it cannot appear on the rigging sheet.
-              {positionId(entity.hole, entity.position)
-                ? <> This one is <b>{positionId(entity.hole, entity.position)}</b>.</>
-                : null}
-            </p>
+            {/* No standing explainer here. The position ids are self-describing
+                in the dropdown (g01 — left, g02 — middle), the panel title
+                already shows the rig position, and the banner below says what
+                is missing at the moment it is actually missing. */}
             {(entity.hole == null || entity.position == null) && (
               <div className="banner bad">
                 This camera has no {entity.hole == null ? 'hole' : 'position'}, so it will be left

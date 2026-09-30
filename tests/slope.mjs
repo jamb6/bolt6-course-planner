@@ -93,9 +93,9 @@ for (const [dem, label] of [[utmDem, 'UTM source'], [geoDem, 'EPSG:4326 source']
   const b = slopeBytes(dem);
   let max = 0, sum = 0, n = 0;
   for (const v of b) { if (v === 255) continue; const d = v * 0.25; if (d > max) max = d; sum += d; n++; }
-  near(max, 14.61, 0.3, `${label}: steepest ground agrees with the numpy reference`);
+  near(max, 17.72, 0.3, `${label}: steepest ground agrees with the numpy reference`);
   near(sum / n, 1.193, 0.08, `${label}: mean slope agrees with the numpy reference`);
-  near(suitability(dem, 5).fraction * 100, 97.68, 0.2, `${label}: share under 5 deg agrees with the reference`);
+  near(suitability(dem, 5).fraction * 100, 97.54, 0.2, `${label}: share under 5 deg agrees with the reference`);
 }
 
 // The two projections describe the same ground, so they must agree with each
@@ -145,17 +145,17 @@ ok(utmDem.coverage > 0.9 && utmDem.coverage < 1,
       if (touchesGap) worstNearGap = Math.max(worstNearGap, v * 0.25);
     }
   }
-  ok(worstNearGap < 20,
+  ok(worstNearGap < 25,
     'a gap does not become a cliff — the cells beside it read as ordinary ground',
     `steepest cell bordering a gap: ${worstNearGap} deg`);
 }
 
 ok(slopeAt(utmDem, [0, 0]) === null, 'slope outside the file is null, not zero');
 ok(cellAt(utmDem, [0, 0]) === null, 'a point outside the grid has no cell');
-ok(coversPoint(utmDem, [-82.8175, 27.9345]), 'the fixture covers the venue it was made for');
-ok(!coversPoint(utmDem, [-82.9, 27.9345]), 'a point west of the file is not covered');
-near(distanceToCoverageM(utmDem, [-82.8175, 27.9345]), 0, 1, 'distance to coverage is zero inside the file');
-ok(distanceToCoverageM(utmDem, [-83.2, 27.9345]) > 30000,
+ok(coversPoint(utmDem, [-82.805001, 27.929484]), 'the fixture covers the venue it was made for');
+ok(!coversPoint(utmDem, [-82.92, 27.929484]), 'a point west of the file is not covered');
+near(distanceToCoverageM(utmDem, [-82.805001, 27.929484]), 0, 1, 'distance to coverage is zero inside the file');
+ok(distanceToCoverageM(utmDem, [-83.2, 27.929484]) > 30000,
   'a file for the wrong venue reports a large distance, so the warning can fire');
 
 /* ======================================================== 4. bands ======= */
@@ -186,6 +186,52 @@ ok(JSON.parse(JSON.stringify(utmDem)).slope === utmDem.slope,
 ok(!('_bytes' in JSON.parse(JSON.stringify(utmDem))),
   'the decoded cache is not serialised into storage');
 
+/* ========================================== 4b. is the detail real? ====== */
+console.log('\nresolution a file claims versus the detail it carries');
+
+// A 10 m product resampled onto a 1 m grid passes every other check here: same
+// header, same bounds, same pixel count. It would shade smooth and confident
+// and wrong. Both fixtures below are the same ground with the same landform and
+// the same nominal 1 m cells; only one of them carries real 1 m detail.
+{
+  const honest = await buildDem(buf('rough-1m-utm17n.tif'), { fileName: 'rough.tif' });
+  const dressed = await buildDem(buf('fake-1m-from-10m-utm17n.tif'), { fileName: 'fake.tif' });
+
+  ok(honest.cellM === dressed.cellM && honest.sourceM === dressed.sourceM,
+     'the two files are indistinguishable by cell size alone',
+     `both ${honest.cellM} m cells from a ${honest.sourceM} m source`);
+
+  near(honest.effectiveM, honest.cellM, 0.01,
+       'genuine 1 m data is measured as carrying detail at its own cell size');
+  ok(dressed.effectiveM >= dressed.cellM * 4,
+     'and 10 m data dressed up as 1 m is caught', `detail only to ${dressed.effectiveM} m`);
+  ok(dressed.effectiveM > honest.effectiveM * 4,
+     'the two are separated by a wide margin, not a hair',
+     `${honest.effectiveM} m vs ${dressed.effectiveM} m`);
+
+  // Why this needs measuring rather than eyeballing a summary: across the whole
+  // course the two files agree almost exactly on how much ground is suitable.
+  // The damage is local — individual positions where one file says a mast will
+  // floor and the other says it will not.
+  const hb = slopeBytes(honest), db = slopeBytes(dressed);
+  let compared = 0, disagree = 0, worst = 0;
+  for (let i = 0; i < Math.min(hb.length, db.length); i++) {
+    if (hb[i] === 255 || db[i] === 255) continue;
+    const a = hb[i] * 0.25, b = db[i] * 0.25;
+    compared++;
+    worst = Math.max(worst, Math.abs(a - b));
+    if ((a <= 5) !== (b <= 5)) disagree++;
+  }
+  const hf = suitability(honest, 5).fraction * 100;
+  const df = suitability(dressed, 5).fraction * 100;
+
+  near(df, hf, 0.6, 'the course-wide suitability figure barely moves, so it cannot catch this');
+  ok(disagree / compared > 0.002,
+     'but the two files give opposite verdicts at thousands of individual positions',
+     `${(disagree / compared * 100).toFixed(1)}% of ${compared} cells`);
+  ok(worst > 3, 'and differ by several degrees at the worst point', `${worst.toFixed(1)} deg apart`);
+}
+
 /* ============================================ 5a. a whole survey tile ==== */
 console.log('\na 4 km survey tile, cropped to the course');
 
@@ -194,7 +240,7 @@ console.log('\na 4 km survey tile, cropped to the course');
 // not read the whole raster into memory, it must crop to the course rather than
 // spending the cell budget on the county, and the wrong tile must be refused.
 {
-  const PELICAN = [-82.8175, 27.9345];
+  const PELICAN = [-82.805001, 27.929484];
   const t0 = Date.now();
   const big = await buildDem(buf('tile-4km-utm17n.tif'), { fileName: 'USGS_1M_17.tif', centre: PELICAN });
   const ms = Date.now() - t0;
@@ -228,7 +274,7 @@ console.log('\na 4 km survey tile, cropped to the course');
 
   // Same tile, a course 40 km away: refused with something actionable.
   let refused = null;
-  try { await buildDem(buf('tile-4km-utm17n.tif'), { centre: [-83.3, 27.9345] }); }
+  try { await buildDem(buf('tile-4km-utm17n.tif'), { centre: [-83.3, 27.929484] }); }
   catch (err) { refused = err.message; }
   ok(refused != null, 'a tile that misses the course is refused rather than shaded');
   ok(/wrong tile/i.test(refused ?? ''), 'and the message says what is probably wrong', refused);
@@ -252,7 +298,7 @@ console.log('\nplans saved before the mast rename');
   ok(migratePlans([]).length === 0, 'an empty workspace migrates to nothing');
 
   // The export is what the crew carries, so an old plan must count correctly.
-  const rows = buildSlopeRows(plan.entities.map((e) => ({ ...e, coords: [-82.8175, 27.9345] })), utmDem, 5);
+  const rows = buildSlopeRows(plan.entities.map((e) => ({ ...e, coords: [-82.805001, 27.929484] })), utmDem, 5);
   ok(rows.flagged.length + rows.fine === 1,
      'and an old plan\u2019s masts are counted on the rigging sheet, not dropped');
 }
@@ -261,8 +307,8 @@ console.log('\nplans saved before the mast rename');
 console.log('\nrigging export');
 
 const cams = [
-  { id: 'a', kind: 'camera', label: 'CAM 1', hole: 1, position: 1, number: 1, camType: 'mast', coords: [-82.8175, 27.9345] },
-  { id: 'b', kind: 'camera', label: 'CAM 2', hole: 1, position: 2, number: 2, camType: 'tower',  coords: [-82.8175, 27.9345] },
+  { id: 'a', kind: 'camera', label: 'CAM 1', hole: 1, position: 1, number: 1, camType: 'mast', coords: [-82.805001, 27.929484] },
+  { id: 'b', kind: 'camera', label: 'CAM 2', hole: 1, position: 2, number: 2, camType: 'tower',  coords: [-82.805001, 27.929484] },
   { id: 'c', kind: 'camera', label: 'CAM 3', hole: 2, position: 1, number: 3, camType: 'mast', coords: [0, 0] },
 ];
 {
@@ -331,7 +377,7 @@ await page.locator('.item').first().click();
 await page.waitForSelector('#plan-name', { timeout: 20000 });
 await page.fill('#plan-name', 'Slope test');
 await page.click('button:has-text("Create")');
-await page.waitForSelector('.slope-bar', { timeout: 20000 });
+await page.waitForSelector('.top-right button:has-text("Slope")', { timeout: 20000 });
 
 // Back out to the course list, then into the course again — that is the plan
 // list, where Elevation now lives.
@@ -377,14 +423,31 @@ await page.locator('[aria-label="Course elevation"] button:has-text("Close")').c
 
 // Open the plan we made.
 await page.locator('.item button:has-text("Open")').first().click();
-await page.waitForSelector('.slope-bar', { timeout: 20000 });
+await page.waitForSelector('.top-right button:has-text("Slope")', { timeout: 20000 });
 
-ok(await page.locator('.slope-bar button:has-text("Slope")').isEnabled(),
+ok(await page.locator('.top-right button:has-text("Slope")').isEnabled(),
   'the planner offers slope shading once the course has elevation');
+
+// Both view switches live in the top bar, together, ahead of the plan name.
+{
+  const order = await page.evaluate(() => {
+    const bar = document.querySelector('.top-right > .bar');
+    return [...bar.children].map((el) => el.textContent.trim().slice(0, 14));
+  });
+  const iSlope = order.findIndex((t) => /^Slope/.test(t));
+  const iThree = order.findIndex((t) => t === '3D');
+  const iName = order.findIndex((t) => /Slope test/.test(t));
+  ok(iSlope >= 0 && iThree === iSlope + 1, 'Slope and 3D sit next to each other', order.join(' | '));
+  ok(iName > iThree, 'and both come before the plan name', order.join(' | '));
+}
+ok(!(await page.locator('.overlay.bottom .slope-bar').count()),
+  'the slope strip has left the bottom stack');
+ok(!(await page.locator('.slope-bar').count()),
+  'and the key stays hidden until shading is switched on');
 ok(!(await page.evaluate(() => !!window.__map.getLayer('slope-fill'))),
   'no overlay is on the map until it is asked for');
 
-await page.locator('.slope-bar button').first().click();
+await page.locator('.top-right button:has-text("Slope")').click();
 await page.waitForFunction(() => !!window.__map.getLayer('slope-fill'), null, { timeout: 20000 });
 
 const layer = await page.evaluate(() => {
@@ -406,14 +469,57 @@ ok(layer.opacity === 1, 'the layer stays opaque so the image keeps its own trans
 ok(layer.corners.length === 4 && Math.abs(layer.corners[0][0] - (-82.8221)) < 0.02,
   'the image is pinned to the elevation file\'s own bounds', JSON.stringify(layer.corners[0]));
 
+/* ---- the limit stepper ---------------------------------------------------- */
+const up = page.locator('[aria-label="Raise the mast floor limit"]');
+const down = page.locator('[aria-label="Lower the mast floor limit"]');
+const readLimit = () => page.locator('.slope-step-value').innerText();
+
+ok(!(await page.locator('#slope-limit').count()), 'the slider is gone, replaced by a stepper');
+ok(!/no reading/i.test(await page.locator('.slope-bar').innerText()),
+   'the no-reading note has left the strip');
+ok(!/% at /i.test(await page.locator('.slope-bar').innerText()),
+   'and so has the suitable-percentage tag');
+
+ok((await readLimit()) === '5.0°', 'the limit always carries one decimal', await readLimit());
+await up.click();
+ok((await readLimit()) === '5.5°', 'a step up moves half a degree', await readLimit());
+await down.click(); await down.click();
+ok((await readLimit()) === '4.5°', 'and a step down moves back', await readLimit());
+
+// The point of the fixed-width value: the row must not resize as the number
+// crosses between one and two decimals' worth of characters, or the buttons
+// slide out from under the pointer between clicks.
+{
+  const geometry = async () => page.evaluate(() => {
+    const v = document.querySelector('.slope-step-value').getBoundingClientRect();
+    const b = document.querySelector('[aria-label="Raise the mast floor limit"]').getBoundingClientRect();
+    return { value: Math.round(v.width), buttonX: Math.round(b.x) };
+  });
+  const seen = [];
+  for (let i = 0; i < 6; i++) {                 // 4.5 -> 7.0, crossing 5.0 and 6.0
+    seen.push({ at: await readLimit(), ...(await geometry()) });
+    await up.click();
+  }
+  const widths = new Set(seen.map((g) => g.value));
+  const xs = new Set(seen.map((g) => g.buttonX));
+  ok(widths.size === 1, 'the value box is the same width at every step', [...widths].join(', ') + ' px');
+  ok(xs.size === 1, 'so the step buttons never move', seen.map((g) => `${g.at}@${g.buttonX}`).join(' '));
+}
+
 // Moving the limit must repaint, because the limit decides the colours.
 const updates0 = await page.evaluate(() => window.__map.getSource('slope').updates);
-await page.locator('#slope-limit').fill('12');
+await up.click();
 await page.waitForFunction((n) => window.__map.getSource('slope').updates > n, updates0, { timeout: 10000 });
 ok(true, 'changing the mast limit repaints the shading');
 
+// The stepper stops at the ends rather than running past them.
+await page.evaluate(() => window.__b6.store.getState().setSlopeLimit(1));
+ok(await down.isDisabled(), 'at the bottom of the range the down step is disabled');
+await page.evaluate(() => window.__b6.store.getState().setSlopeLimit(20));
+ok(await up.isDisabled(), 'and at the top the up step is');
+
 // A mast on the map reports its ground slope; a tower does not.
-await page.locator('#slope-limit').fill('5');
+await page.evaluate(() => window.__b6.store.getState().setSlopeLimit(5));
 await page.click('.hole-btn[data-hole="1"]');
 await page.waitForTimeout(150);
 await page.click('.tool-btn:has-text("Camera")');

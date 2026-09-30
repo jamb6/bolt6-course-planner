@@ -44,7 +44,7 @@ export const LPGA_SCHEDULE = [
   { dates: 'Oct 18 – 24',      event: 'Buick LPGA Shanghai',                venue: 'Sheshan International Golf Club',    place: 'Shanghai, China' },
   { dates: 'Oct 25 – 31',      event: 'Maybank Championship',               venue: 'Kuala Lumpur Golf & Country Club',   place: 'Kuala Lumpur, Malaysia' },
   { dates: 'Nov 1 – 7',        event: 'Konami Japan Classic',               venue: 'Taiheiyo Club, Minori Course',       place: 'Japan' },
-  { dates: 'Nov 8 – 14',       event: 'ANNIKA driven by Gainbridge at Pelican', venue: 'Pelican Golf Club',              place: 'Belleair, Florida', lngLat: [-82.8175, 27.9345] },
+  { dates: 'Nov 8 – 14',       event: 'ANNIKA driven by Gainbridge at Pelican', venue: 'Pelican Golf Club',              place: 'Belleair, Florida', lngLat: [-82.805001, 27.929484] },
   { dates: 'Nov 15 – 21',      event: 'CME Group Tour Championship',        venue: 'Tiburón Golf Club',                  place: 'Naples, Florida' },
   { dates: 'Dec 6 – 12',       event: 'Grant Thornton Invitational',        venue: 'Tiburón Golf Club',                  place: 'Naples, Florida' },
 ];

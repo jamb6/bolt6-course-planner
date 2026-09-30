@@ -285,10 +285,67 @@ function resampleToLngLat(src, maxCells = MAX_DEM_CELLS) {
 
   return {
     cols, rows, west, south, east, north, elev, nativeM,
+    cellM: (dLng * mPerDegLng(midLat) + dLat * mPerDegLat(midLat)) / 2,
     cellXM: dLng * mPerDegLng(midLat),
     cellYM: dLat * mPerDegLat(midLat),
     coverage: covered / (cols * rows),
   };
+}
+
+/* --------------------------------------------- how real is the detail? ---- */
+
+/**
+ * The finest scale at which the data actually carries information.
+ *
+ * A file's header says what its cell size is, not whether the cells mean
+ * anything. A 10 m product resampled onto a 1 m grid looks like 1 m data to
+ * every check in this file — same header, same bounds, same pixel count — and
+ * produces smooth, confident, wrong shading. That is the one failure this whole
+ * feature exists to avoid, so it is worth measuring rather than trusting.
+ *
+ * The measurement: curvature at stride k, meaning the average second difference
+ * over k cells. Real ground has roughness at every scale, so halving the stride
+ * roughly halves the curvature ratio toward 0.25 but stays clearly above it.
+ * Linear interpolation, by contrast, has *zero* curvature inside a cell, which
+ * pins the ratio to exactly 0.25 at every stride finer than the true one. So
+ * the first stride whose ratio lifts off that floor is where the real data
+ * starts.
+ *
+ * Returns metres, or null when the grid is too small or too empty to judge.
+ */
+export function effectiveResolutionM({ elev, cols, rows, cellM }) {
+  const curvature = (k) => {
+    let sum = 0, n = 0;
+    const add = (a, b, c) => {
+      if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c)) return;
+      sum += Math.abs(a - 2 * b + c); n++;
+    };
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c + 2 * k < cols; c++) {
+        add(elev[r * cols + c], elev[r * cols + c + k], elev[r * cols + c + 2 * k]);
+      }
+    }
+    for (let c = 0; c < cols; c++) {
+      for (let r = 0; r + 2 * k < rows; r++) {
+        add(elev[r * cols + c], elev[(r + k) * cols + c], elev[(r + 2 * k) * cols + c]);
+      }
+    }
+    return n > 100 ? sum / n : null;
+  };
+
+  const STRIDES = [1, 2, 4, 8, 16];
+  const rough = new Map();
+  for (const k of [...STRIDES, 32]) rough.set(k, curvature(k));
+
+  for (const k of STRIDES) {
+    const a = rough.get(k), b = rough.get(k * 2);
+    if (a == null || b == null || !(b > 0)) break;
+    // 0.25 is the interpolation floor; 0.28 leaves room for rounding without
+    // mistaking real ground for invented detail.
+    if (a / b > 0.28) return cellM * k;
+  }
+  // Nothing lifted off the floor at any stride we can measure.
+  return rough.get(32) == null ? null : cellM * 32;
 }
 
 /* ------------------------------------------------------------- slope ------ */
@@ -395,6 +452,7 @@ export async function buildDem(
   const src = await readWindow(file, box);
   const grid = resampleToLngLat(src, maxCells);
   const slope = slopeGrid(grid);
+  const effectiveM = effectiveResolutionM(grid);
 
   if (!grid.coverage) {
     throw new Error('Every pixel in this file is marked as no data. Check the export and try again.');
@@ -415,6 +473,7 @@ export async function buildDem(
     west: grid.west, south: grid.south, east: grid.east, north: grid.north,
     cellM: Math.round(((grid.cellXM + grid.cellYM) / 2) * 100) / 100,
     sourceM: Math.round(grid.nativeM * 100) / 100,
+    effectiveM: effectiveM == null ? null : Math.round(effectiveM * 100) / 100,
     sourceEpsg: src.epsg,
     sourceCrs: src.proj.name,
     sourcePixels: file.width * file.height,

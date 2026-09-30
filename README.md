@@ -361,7 +361,7 @@ Four more suites cover what is hard to reproduce by hand: `osm.mjs` for
 OpenStreetMap rate-limiting, hanging and cancellation; `layout.mjs` for
 building a hole layout from nothing; `writes.mjs` for the write batching that
 keeps two people from overwriting each other; and `slope.mjs` for the elevation
-pipeline. 241 assertions in total.
+pipeline. 252 assertions in total.
 
 `slope.mjs` is checked against outside references rather than against itself:
 the projections against **pyproj**, the slope computation against an

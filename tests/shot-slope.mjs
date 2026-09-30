@@ -44,7 +44,7 @@ for (const [label, viewport] of [
   await page.waitForSelector('#plan-name');
   await page.fill('#plan-name', 'Slope');
   await page.click('button:has-text("Create")');
-  await page.waitForSelector('.slope-bar');
+  await page.waitForSelector('.top-right button:has-text("Slope")');
 
   // Back to the plan list, where Elevation lives now.
   await page.click('.top-right button:has-text("Menu")');
@@ -65,9 +65,9 @@ for (const [label, viewport] of [
 
   await page.locator('[aria-label="Course elevation"] button:has-text("Close")').click();
   await page.locator('.item button:has-text("Open")').first().click();
-  await page.waitForSelector('.slope-bar');
+  await page.waitForSelector('.top-right button:has-text("Slope")');
 
-  await page.locator('.slope-bar button').first().click();
+  await page.locator('.top-right button:has-text("Slope")').click();
   await page.waitForFunction(() => !!window.__map.getLayer('slope-fill'), null, { timeout: 20000 });
   await page.click('.hole-btn[data-hole="1"]');
   await page.waitForTimeout(200);
@@ -79,13 +79,15 @@ for (const [label, viewport] of [
 
   // 3D on, to check the top bar still fits and nothing is pushed off screen.
   await page.click('.top-right button:has-text("3D")');
-  await page.waitForTimeout(400);
+  // Let the toast clear, or it covers the bar this shot exists to check.
+  await page.waitForTimeout(3000);
   await page.screenshot({ path: `tests/shot-3d-${label}.png` });
   const bar = await page.evaluate(() => {
-    const b = document.querySelector('.top-right');
+    const b = document.querySelector('.top-right > .bar');
     const r = b.getBoundingClientRect();
     return { x: Math.round(r.x), right: Math.round(r.right), vw: window.innerWidth,
-             scrolls: b.scrollWidth > b.clientWidth + 1 };
+             content: b.scrollWidth, box: b.clientWidth,
+             clipped: b.scrollWidth > b.clientWidth + 1 };
   });
   console.log(`  ${label} top bar`, JSON.stringify(bar));
   await ctx.close();

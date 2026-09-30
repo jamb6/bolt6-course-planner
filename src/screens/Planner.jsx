@@ -6,7 +6,7 @@ import LayoutBar from '../components/LayoutBar.jsx';
 import EntityPanel from '../components/EntityPanel.jsx';
 import MenuSheet from '../components/MenuSheet.jsx';
 import StatsBar from '../components/StatsBar.jsx';
-import SlopeBar from '../components/SlopeBar.jsx';
+import { SlopeToggle, SlopeLegend } from '../components/SlopeBar.jsx';
 import { useStore } from '../store/useStore.js';
 
 /** The map screen. Composes the overlays; the map itself lives in MapView. */
@@ -55,37 +55,43 @@ export default function Planner({ onExit }) {
     <div className={panelOpen ? 'planner with-panel' : 'planner'}>
       <MapView />
 
-      <div className="overlay top-right bar">
-        <StatsBar scope="course" />
-        <div style={{ padding: '0 6px', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          <b style={{ fontSize: 13 }}>{plan?.name}</b>
-          <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>{course?.name}</div>
+      <div className="overlay top-right">
+        <div className="bar">
+          <StatsBar scope="course" />
+          {/* The two view switches sit together, left of the plan name. */}
+          <SlopeToggle />
+          <button className="btn ghost" aria-pressed={view3d}
+                  title="Tilt into a 3D view of the terrain — for looking at, not for measuring"
+                  onClick={() => {
+                    // Said once, on the way in: the relief and the slope shading
+                    // come from different data and can disagree.
+                    if (!view3d) say('3D terrain is Mapbox\u2019s global elevation, for context only \u2014 slope shading is the measured one.');
+                    toggle3d();
+                  }}>
+            3D
+          </button>
+          <div className="plan-title">
+            <b>{plan?.name}</b>
+            <div>{course?.name}</div>
+          </div>
+          <span className="tag">{saved ? 'Saved' : 'Saving…'}</span>
+          <button className="btn ghost" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}>Menu</button>
         </div>
-        <span className="tag">{saved ? 'Saved' : 'Saving…'}</span>
-        <button className="btn ghost" aria-pressed={view3d}
-                title="Tilt into a 3D view of the terrain — for looking at, not for measuring"
-                onClick={() => {
-                  // Said once, on the way in: the relief and the slope shading
-                  // come from different data and can disagree.
-                  if (!view3d) say('3D terrain is Mapbox\u2019s global elevation, for context only \u2014 slope shading is the measured one.');
-                  toggle3d();
-                }}>
-          3D
-        </button>
-        <button className="btn ghost" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}>Menu</button>
+        <SlopeLegend />
+        {/* Under the controls rather than floating: it can then never land on
+            the view switches or the hole strip, at any screen width. */}
+        {(toast || hint) && <div className="toast">{toast ?? hint}</div>}
       </div>
 
       <MenuSheet open={menuOpen} onClose={() => setMenuOpen(false)} onExit={onExit} onToast={say} />
 
       <div className="overlay bottom">
-        <SlopeBar />
         {layout ? <LayoutBar /> : <BuildToolbar />}
         <HoleSelector />
       </div>
 
       <EntityPanel onMove={(id) => { beginMove(id); say('Click the map to move it'); }} />
 
-      {(toast || hint) && <div className="toast">{toast ?? hint}</div>}
     </div>
   );
 }

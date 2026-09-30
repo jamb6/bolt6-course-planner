@@ -175,6 +175,30 @@ GeoTIFF, for nothing.
   large share of the browser's quota, so a few courses will fill it — the app
   says so plainly rather than failing silently.
 
+## Is the detail real?
+
+A file's header says what its cell size is, not whether the cells mean anything.
+A 10 m product resampled onto a 1 m grid has the same header, the same bounds
+and the same pixel count as genuine 1 m data — and shades smooth, confident and
+wrong.
+
+So the app measures it. Real ground has roughness at every scale; linear
+interpolation has none inside a cell, which leaves a precise fingerprint in the
+curvature at short strides. The upload screen reports **detail to N m** beside
+the cell size, and says so plainly when the detail is much coarser than the
+cells claim.
+
+It reports rather than accuses, because smooth ground and resampled data look
+alike: a links fairway really can be that featureless. Check where the file came
+from before dismissing it either way.
+
+Why this is worth measuring rather than eyeballing: across a whole course the
+two kinds of file agree on the suitable-ground percentage almost exactly
+(97.3% against 97.5% in the test fixtures). The damage is local — individual
+positions, thousands of them, where one file says a mast will floor and the
+other says it will not, differing by up to 6.5 degrees at the worst point. No
+summary statistic catches that.
+
 ## Accuracy
 
 The projection maths is checked against **pyproj** and the slope computation
@@ -189,6 +213,10 @@ against an independent **numpy** implementation of the same method, both in
   97.6% against the reference's 97.7%;
 - and the same ground supplied as UTM and as EPSG:4326 reaches the same answer
   to within half a percent.
+
+Two fixtures carry the same landform at the same nominal 1 m cells, one with
+genuine metre-scale roughness and one resampled up from 10 m, which is how the
+detail check above is tested.
 
 ## If a file is refused
 

@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { useStore } from '../store/useStore.js';
 import { SLOPE_COLOURS, SLOPE_MARGIN_DEG, MAST_SLOPE_RANGE } from '../data/constants.js';
-import { suitability } from '../lib/dem.js';
 
 const rgb = (c) => `rgb(${c[0]},${c[1]},${c[2]})`;
 
@@ -13,64 +12,77 @@ const Swatch = ({ colour, children }) => (
 );
 
 /**
- * Slope shading: the switch, the key, and the limit it is drawn against.
+ * The slope switch, sized for the top bar next to 3D.
  *
- * The limit is adjustable from here rather than only from the course screen,
- * because the useful move is to drag it and watch the green retreat — that is
- * how you find out whether a position is comfortably fine or only just.
+ * Only the toggle lives up there. The limit and the colour key are a second
+ * strip underneath, shown while shading is on — the top bar is already carrying
+ * the course totals, the plan name and the menu, and a slider plus a four-item
+ * key would push the lot off a phone.
  */
-export default function SlopeBar() {
-  const dem = useStore((s) => s.dem);
+export function SlopeToggle() {
   const demState = useStore((s) => s.demState);
   const demError = useStore((s) => s.demError);
   const slopeOn = useStore((s) => s.slopeOn);
-  const limit = useStore((s) => s.slopeLimit);
   const toggleSlope = useStore((s) => s.toggleSlope);
-  const setSlopeLimit = useStore((s) => s.setSlopeLimit);
   const loadDem = useStore((s) => s.loadDem);
   const courseId = useStore((s) => s.course?.id);
-  const view3d = useStore((s) => s.view3d);
 
   /* Find out whether this course has elevation without waiting to be asked, so
      the button can say what it will do before it is pressed. */
   useEffect(() => { if (courseId && demState === 'idle') loadDem(courseId); }, [courseId, demState, loadDem]);
 
-  const stats = dem && slopeOn ? suitability(dem, limit) : null;
+  const title = demState === 'none'
+    ? 'No elevation for this course — add a GeoTIFF from the plan list'
+    : demState === 'error'
+      ? `Elevation failed: ${demError}`
+      : 'Shade the ground by how steep it is';
+
+  return (
+    <button className="btn ghost" aria-pressed={slopeOn} title={title}
+            disabled={demState === 'loading' || demState === 'none' || demState === 'error'}
+            onClick={toggleSlope}>
+      {demState === 'loading' ? 'Slope…' : 'Slope'}
+    </button>
+  );
+}
+
+const [LIMIT_MIN, LIMIT_MAX] = MAST_SLOPE_RANGE;
+const LIMIT_STEP = 0.5;
+
+/** The mast floor limit, and what the colours mean. Only while shading. */
+export function SlopeLegend() {
+  const dem = useStore((s) => s.dem);
+  const slopeOn = useStore((s) => s.slopeOn);
+  const limit = useStore((s) => s.slopeLimit);
+  const setSlopeLimit = useStore((s) => s.setSlopeLimit);
+  const view3d = useStore((s) => s.view3d);
+
+  if (!slopeOn || !dem) return null;
+
+  // Rounded because 0.5 steps in binary floating point drift otherwise.
+  const step = (by) =>
+    setSlopeLimit(Math.round(Math.min(LIMIT_MAX, Math.max(LIMIT_MIN, limit + by)) * 2) / 2);
 
   return (
     <div className="slope-bar">
-      <button className="btn ghost" aria-pressed={slopeOn}
-              disabled={demState === 'loading' || demState === 'none'}
-              onClick={toggleSlope}
-              title={demState === 'none'
-                ? 'No elevation for this course — upload a GeoTIFF from the course list'
-                : 'Shade the ground by how steep it is'}>
-        {demState === 'loading' ? 'Slope…' : slopeOn ? 'Slope on' : 'Slope'}
-      </button>
-
-      {demState === 'none' && <span className="tag">No elevation</span>}
-      {demState === 'error' && <span className="tag bad">Elevation failed: {demError}</span>}
-
-      {slopeOn && dem && (
-        <>
-          <label htmlFor="slope-limit" className="slope-limit">
-            <span>{limit}°</span>
-            <input id="slope-limit" type="range"
-                   min={MAST_SLOPE_RANGE[0]} max={MAST_SLOPE_RANGE[1]} step={0.5}
-                   value={limit} onChange={(e) => setSlopeLimit(Number(e.target.value))} />
-          </label>
-          <span className="slope-key">
-            <Swatch colour={SLOPE_COLOURS.flat}>fine</Swatch>
-            <Swatch colour={SLOPE_COLOURS.near}>within {SLOPE_MARGIN_DEG}°</Swatch>
-            <Swatch colour={SLOPE_COLOURS.steep}>too steep</Swatch>
-            <span style={{ color: 'var(--dim)' }}>unshaded = no reading</span>
-          </span>
-          {stats && <span className="tag">{Math.round(stats.fraction * 100)}% at {limit}°</span>}
-          {/* The 3D relief is a coarse global DEM and will not show a bank this
-              shading calls too steep. Say which one to believe. */}
-          {view3d && <span className="tag">shading is measured · relief is not</span>}
-        </>
-      )}
+      <div className="slope-step" title="Mast floor limit">
+        <button className="btn ghost" aria-label="Lower the mast floor limit"
+                disabled={limit <= LIMIT_MIN} onClick={() => step(-LIMIT_STEP)}>‹</button>
+        {/* Always one decimal, in a fixed-width box. Letting it flip between
+            "4°" and "3.5°" resized the row and shifted the buttons out from
+            under the pointer between clicks. */}
+        <span className="slope-step-value" aria-live="polite">{limit.toFixed(1)}°</span>
+        <button className="btn ghost" aria-label="Raise the mast floor limit"
+                disabled={limit >= LIMIT_MAX} onClick={() => step(LIMIT_STEP)}>›</button>
+      </div>
+      <span className="slope-key">
+        <Swatch colour={SLOPE_COLOURS.flat}>fine</Swatch>
+        <Swatch colour={SLOPE_COLOURS.near}>within {SLOPE_MARGIN_DEG}°</Swatch>
+        <Swatch colour={SLOPE_COLOURS.steep}>too steep</Swatch>
+      </span>
+      {/* The 3D relief is a coarse global DEM and will not show a bank this
+          shading calls too steep. Say which one to believe. */}
+      {view3d && <span className="tag">shading is measured · relief is not</span>}
     </div>
   );
 }
